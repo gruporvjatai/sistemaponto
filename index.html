@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Ponto Eletrônico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold mb-2 text-blue-800">Bater Ponto</h1>
+        <p id="status-obra" class="text-gray-500 mb-6">Identificando Obra...</p>
+
+        <div id="gps-status" class="mb-6 p-4 rounded bg-yellow-100 text-yellow-800 text-sm">
+            Aguardando localização do GPS...
+        </div>
+
+        <div class="mb-4 text-left">
+            <label class="block text-gray-700 font-bold mb-2">Quem é você?</label>
+            <select id="funcionario-select" class="w-full p-3 border rounded shadow-sm">
+                <option value="">Selecione seu nome...</option>
+                </select>
+        </div>
+
+        <div class="flex gap-4 mb-6">
+            <button id="btn-entrada" disabled class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded opacity-50 cursor-not-allowed transition-all">
+                ENTRADA
+            </button>
+            <button id="btn-saida" disabled class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded opacity-50 cursor-not-allowed transition-all">
+                SAÍDA
+            </button>
+        </div>
+
+        <button onclick="toggleSupervisor()" class="text-sm text-blue-500 underline mt-4">Acesso do Supervisor</button>
+        
+        <div id="area-supervisor" class="hidden mt-6 p-4 border-t-2 border-gray-200">
+            <h3 class="font-bold text-gray-700 mb-2">Modo Supervisor</h3>
+            <input type="password" id="senha-supervisor" placeholder="Senha do encarregado" class="w-full p-2 border rounded mb-2">
+            <button onclick="liberarPontoManual()" class="w-full bg-gray-800 text-white p-2 rounded">Liberar Ponto Manual (Sem GPS)</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. CONFIGURAÇÕES DO SUPABASE (PREENCHA AQUI)
+        // ==========================================
+        const SUPABASE_URL = 'https://lyieiqhkspbowsrlngvn.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ==========================================
+        // 2. LENDO OS PARÂMETROS DA URL (Vindos do QR Code)
+        // Ex: ?obra_id=1&lat=-17.881&lng=-51.721
+        // ==========================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const obraId = urlParams.get('obra_id');
+        const obraLat = parseFloat(urlParams.get('lat'));
+        const obraLng = parseFloat(urlParams.get('lng'));
+        
+        const RAIO_PERMITIDO_METROS = 50; 
+        let userLat = null;
+        let userLng = null;
+        let distanciaMetros = null;
+
+        // Se a URL não tiver os dados da obra
+        if (!obraId || !obraLat || !obraLng) {
+            document.getElementById('gps-status').innerHTML = "⚠️ QR Code inválido. Faltam dados da obra no link.";
+            document.getElementById('gps-status').className = "mb-6 p-4 rounded bg-red-100 text-red-800 text-sm";
+        } else {
+            document.getElementById('status-obra').innerText = "Obra ID: " + obraId;
+            iniciarGPS();
+            carregarFuncionarios();
+        }
+
+        // ==========================================
+        // 3. LÓGICA DE GEOLOCALIZAÇÃO
+        // ==========================================
+        function iniciarGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLat = position.coords.latitude;
+                        userLng = position.coords.longitude;
+                        validarDistancia();
+                    },
+                    (error) => {
+                        document.getElementById('gps-status').innerHTML = "❌ Erro ao pegar GPS. Ative a localização!";
+                        document.getElementById('gps-status').className = "mb-6 p-4 rounded bg-red-100 text-red-800 text-sm";
+                    },
+                    { enableHighAccuracy: true } // Força a usar o GPS preciso do celular
+                );
+            } else {
+                alert("Seu navegador não suporta GPS.");
+            }
+        }
+
+        // Fórmula de Haversine para calcular distância entre duas coordenadas em metros
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Raio da Terra em metros
+            const p1 = lat1 * Math.PI/180;
+            const p2 = lat2 * Math.PI/180;
+            const dp = (lat2-lat1) * Math.PI/180;
+            const dl = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(dp/2) * Math.sin(dp/2) +
+                      Math.cos(p1) * Math.cos(p2) *
+                      Math.sin(dl/2) * Math.sin(dl/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Em metros
+        }
+
+        function validarDistancia() {
+            distanciaMetros = calcularDistancia(userLat, userLng, obraLat, obraLng);
+            const statusDiv = document.getElementById('gps-status');
+
+            if (distanciaMetros <= RAIO_PERMITIDO_METROS) {
+                statusDiv.innerHTML = `✅ Você está na obra. (${Math.round(distanciaMetros)}m de distância).`;
+                statusDiv.className = "mb-6 p-4 rounded bg-green-100 text-green-800 text-sm";
+                habilitarBotoes();
+            } else {
+                statusDiv.innerHTML = `❌ Você está muito longe da obra! (${Math.round(distanciaMetros)}m). Aproxime-se.`;
+                statusDiv.className = "mb-6 p-4 rounded bg-red-100 text-red-800 text-sm";
+            }
+        }
+
+        function habilitarBotoes() {
+            const btnEntrada = document.getElementById('btn-entrada');
+            const btnSaida = document.getElementById('btn-saida');
+            
+            btnEntrada.disabled = false;
+            btnEntrada.classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            btnSaida.disabled = false;
+            btnSaida.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // ==========================================
+        // 4. INTEGRAÇÃO SUPABASE (Busca e Registro)
+        // ==========================================
+        async function carregarFuncionarios() {
+            // Busca apenas os funcionários alocados nesta obra (opcional, ou busca todos)
+            const { data, error } = await supabaseClient
+                .from('jsp_equipe')
+                .select('id, nome');
+            
+            if (error) {
+                console.error("Erro ao buscar equipe:", error);
+                return;
+            }
+
+            const select = document.getElementById('funcionario-select');
+            data.forEach(func => {
+                const option = document.createElement('option');
+                option.value = func.id;
+                option.text = func.nome;
+                select.appendChild(option);
+            });
+        }
+
+        async function registrarPonto(tipo) {
+            const funcId = document.getElementById('funcionario-select').value;
+            if(!funcId) {
+                alert("Selecione seu nome primeiro!");
+                return;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('jsp_ponto_diario')
+                .insert([
+                    { 
+                        funcionario_id: funcId, 
+                        obra_id: obraId,
+                        tipo: tipo,
+                        lat_registro: userLat.toString(),
+                        lng_registro: userLng.toString()
+                    }
+                ]);
+
+            if (error) {
+                alert("Erro ao registrar ponto: " + error.message);
+            } else {
+                alert(`Ponto de ${tipo} registrado com sucesso!`);
+                document.getElementById('funcionario-select').value = ''; // Reseta
+            }
+        }
+
+        // Eventos dos botões
+        document.getElementById('btn-entrada').addEventListener('click', () => registrarPonto('ENTRADA'));
+        document.getElementById('btn-saida').addEventListener('click', () => registrarPonto('SAIDA'));
+
+        // ==========================================
+        // 5. MODO SUPERVISOR
+        // ==========================================
+        function toggleSupervisor() {
+            const div = document.getElementById('area-supervisor');
+            div.classList.toggle('hidden');
+        }
+
+        function liberarPontoManual() {
+            const senha = document.getElementById('senha-supervisor').value;
+            if(senha === '123456') { // Troque pela senha real do encarregado
+                habilitarBotoes();
+                document.getElementById('gps-status').innerHTML = "🔓 Liberação Manual Ativada pelo Supervisor.";
+                document.getElementById('gps-status').className = "mb-6 p-4 rounded bg-blue-100 text-blue-800 text-sm";
+            } else {
+                alert("Senha Incorreta!");
+            }
+        }
+    </script>
+</body>
+</html>
