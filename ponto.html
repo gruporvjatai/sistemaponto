@@ -87,6 +87,7 @@
         const SUPABASE_URL = 'https://lyieiqhkspbowsrlngvn.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const TRAVAR_POR_OBRA = true;
 
         const urlParams = new URLSearchParams(window.location.search);
         const obraId = urlParams.get('obra_id'); 
@@ -174,8 +175,8 @@
                 }
 
                 // Carrega a equipa logo de seguida
-                const { data: equipa } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula');
-
+                const { data: equipa } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula, obra_atual_id');
+                
                 return { sucesso: true, obra: obra, equipa: equipa || [] };
             } catch (err) {
                 return { sucesso: false, mensagem: "Falha ao conectar com o banco de dados." };
@@ -220,6 +221,15 @@
             const funcionario = equipeGlobal.find(e => e.matricula == inputDigitado);
             if(!funcionario) return alert("Matrícula não encontrada! Verifique os números.");
 
+            // ======== TRAVA DE SEGURANÇA DA OBRA ========
+            // Bloqueia o registro se o peão não pertencer à obra do QR Code lido
+            if (TRAVAR_POR_OBRA) {
+                if (funcionario.obra_atual_id != obraId) {
+                    return alert("❌ ACESSO NEGADO: Sua matrícula não está vinculada a esta obra. Procure o Encarregado!");
+                }
+            }
+            // ============================================
+
             const btn = document.getElementById('btn-registrar');
             btn.innerHTML = '<i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> A REGISTAR...';
             btn.disabled = true;
@@ -229,7 +239,7 @@
             const horaExata = dataAtual.toLocaleTimeString('pt-BR', { hour12: false });
             
             // ==== CORREÇÃO DO FUSO HORÁRIO ====
-            // Pega o fuso do celular (em Goias/Brasil) e ajusta antes de mandar pro Supabase
+            // Pega o fuso do celular e ajusta antes de mandar pro Supabase para não somar 3 horas
             const fusoOffset = dataAtual.getTimezoneOffset() * 60000;
             const horaLocalParaSalvar = new Date(dataAtual.getTime() - fusoOffset).toISOString().slice(0, 19);
             // ===================================
@@ -239,7 +249,7 @@
                 obra_id: obraId,
                 tipo: 'PENDENTE',       
                 status: 'PENDENTE',     
-                hora_registro: horaLocalParaSalvar, // Usando a hora cravada
+                hora_registro: horaLocalParaSalvar, // Usando a hora cravada corrigida
                 lat_registro: userLat ? userLat.toString() : '',
                 lng_registro: userLng ? userLng.toString() : ''
             }]);
@@ -259,6 +269,8 @@
             }
             lucide.createIcons();
         }
+
+        
         function voltarParaRegistro() {
             document.getElementById('tela-sucesso').classList.add('hidden');
             document.getElementById('tela-registro').classList.remove('hidden');
