@@ -10,11 +10,15 @@
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div class="w-full max-w-xl bg-white p-6 rounded-xl shadow-2xl transition-all">
-        <div class="flex justify-between items-center mb-6 border-b pb-4">
-            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <i data-lucide="shield-check" class="text-blue-600"></i> Painel do Encarregado
-            </h2>
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+            <div class="flex items-center gap-2">
+                <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="shield-check" class="text-blue-600"></i> Painel
+                </h2>
+                <button id="btn-trocar-obra" onclick="voltarSelecaoObra()" class="hidden bg-slate-100 hover:bg-slate-200 text-slate-500 p-2 rounded-lg transition border border-slate-200" title="Trocar Obra">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                </button>
+            </div>
             <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-8">
         </div>
 
@@ -137,6 +141,7 @@
             document.getElementById('nome-obra-titulo').innerText = sel.options[sel.selectedIndex].text;
             document.getElementById('selecao-obra').classList.add('hidden');
             document.getElementById('painel-supervisor').classList.remove('hidden');
+            document.getElementById('btn-trocar-obra').classList.remove('hidden');
             await carregarEquipe();
             carregarPendentes();
         }
@@ -369,6 +374,22 @@
 
             // Volta o botão ao normal
             btn.innerHTML = textoOriginal;
+        }
+
+        function voltarSelecaoObra() {
+            // 1. Esconde o painel da obra e o próprio botão de troca
+            document.getElementById('painel-supervisor').classList.add('hidden');
+            document.getElementById('btn-trocar-obra').classList.add('hidden');
+
+            // 2. Mostra a tela de seleção de obras
+            document.getElementById('selecao-obra').classList.remove('hidden');
+
+            // 3. Limpa o QR Code anterior para não confundir o encarregado
+            document.getElementById('area-qr-code').classList.add('hidden');
+            document.getElementById('area-qr-code').classList.remove('flex');
+            document.getElementById('img-qr-code').src = "";
+            
+            lucide.createIcons();
         }
     </script>
 </body>
