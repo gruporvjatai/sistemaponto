@@ -221,12 +221,18 @@
             const dataAtual = new Date();
             const horaExata = dataAtual.toLocaleTimeString('pt-BR', { hour12: false });
             
+            // ==== CORREÇÃO DO FUSO HORÁRIO ====
+            // Pega o fuso do celular (em Goias/Brasil) e ajusta antes de mandar pro Supabase
+            const fusoOffset = dataAtual.getTimezoneOffset() * 60000;
+            const horaLocalParaSalvar = new Date(dataAtual.getTime() - fusoOffset).toISOString().slice(0, 19);
+            // ===================================
+            
             const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
                 funcionario_id: funcionario.id,
                 obra_id: obraId,
                 tipo: 'PENDENTE',       
                 status: 'PENDENTE',     
-                hora_registro: dataAtual.toISOString(), 
+                hora_registro: horaLocalParaSalvar, // Usando a hora cravada
                 lat_registro: userLat ? userLat.toString() : '',
                 lng_registro: userLng ? userLng.toString() : ''
             }]);
@@ -246,7 +252,6 @@
             }
             lucide.createIcons();
         }
-
         function voltarParaRegistro() {
             document.getElementById('tela-sucesso').classList.add('hidden');
             document.getElementById('tela-registro').classList.remove('hidden');
