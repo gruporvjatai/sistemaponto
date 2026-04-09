@@ -131,17 +131,8 @@
 
         // FUNÇÃO AJUDANTE DE FUSO HORÁRIO BRASIL (Evita +3h no banco)
         // FUNÇÃO AJUDANTE CORRIGIDA (Força o fuso do Brasil -03:00)
-        function getHoraLocalParaSalvar(dataObj) {
-            const ano = dataObj.getFullYear();
-            const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
-            const dia = String(dataObj.getDate()).padStart(2, '0');
-            const horas = String(dataObj.getHours()).padStart(2, '0');
-            const minutos = String(dataObj.getMinutes()).padStart(2, '0');
-            const segundos = String(dataObj.getSeconds()).padStart(2, '0');
-            
-            // Retorna ex: "2026-04-09T10:25:00-03:00"
-            return `${ano}-${mes}-${dia}T${horas}:${minutos}:${segundos}-03:00`;
-        }
+        // PODE APAGAR ISSO TUDO AQUI:
+function getHoraLocalParaSalvar(dataObj) { ... }
 
         function loginSupervisor() {
             if(document.getElementById('senha-supervisor').value === '15748') {
@@ -257,12 +248,11 @@
             const tipo = document.getElementById(`tipo-edit-${pontoId}`).value;
             const horaEditada = document.getElementById(`hora-edit-${pontoId}`).value;
             
-            // 1. Atualiza a Entrada (Ponto que o funcionário bateu)
-            let dataSalvar = new Date(horaOriginal);
-            const [h, m] = horaEditada.split(':');
-            dataSalvar.setHours(parseInt(h), parseInt(m), 0);
+            // 1. LÓGICA DE TEXTO: Corta a data original ignorando fuso (Pega só o YYYY-MM-DD)
+            const dataApenas = horaOriginal.split('T')[0];
             
-            const horaLocalCravada = getHoraLocalParaSalvar(dataSalvar);
+            // Monta a string exata que tá na tela. Ex: "2026-04-09T07:25:00"
+            const horaLocalCravada = `${dataApenas}T${horaEditada}:00`;
 
             await supabaseClient.from('jsp_ponto_diario').update({ 
                 status: 'VALIDADO', 
@@ -272,13 +262,13 @@
 
             // 2. LÓGICA DE SAÍDA AUTOMÁTICA
             if (tipo === 'ENTRADA') {
-                // Se a entrada for antes das 12h, saída é 11h. Senão, saída é 17h.
-                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
-
-                let dataSaida = new Date(horaOriginal);
-                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
-
-                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+                const h = parseInt(horaEditada.split(':')[0]);
+                
+                // Se a entrada for antes do meio dia, saída 11:00. Senão, 17:00.
+                const horaSaidaAutomatica = h < 12 ? "11:00:00" : "17:00:00";
+                
+                // Monta a saída também no formato de texto puro
+                const horaSaidaCravada = `${dataApenas}T${horaSaidaAutomatica}`;
 
                 await supabaseClient.from('jsp_ponto_diario').insert([{
                     funcionario_id: funcionarioId,
@@ -294,6 +284,7 @@
             carregarPendentes();
         }
 
+        
         async function recusar(pontoId) {
             if(confirm("Apagar registro permanentemente?")) {
                 await supabaseClient.from('jsp_ponto_diario').delete().eq('id', pontoId);
@@ -313,13 +304,15 @@
             const tipo = document.getElementById('manual-tipo').value;
             if(!fId || !hora) return;
             
-            let dataManual = new Date(); 
-            const [h, m] = hora.split(':'); 
-            dataManual.setHours(parseInt(h), parseInt(m), 0);
+            // Monta a data de hoje manualmente em texto (YYYY-MM-DD)
+            const hojeLocal = new Date();
+            const ano = hojeLocal.getFullYear();
+            const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
+            const dia = String(hojeLocal.getDate()).padStart(2, '0');
+            const dataApenas = `${ano}-${mes}-${dia}`;
             
-            const horaLocalCravada = getHoraLocalParaSalvar(dataManual);
+            const horaLocalCravada = `${dataApenas}T${hora}:00`;
 
-            // 1. Salva o ponto manual
             await supabaseClient.from('jsp_ponto_diario').insert([{ 
                 funcionario_id: fId, 
                 obra_id: obraAtualId, 
@@ -330,14 +323,10 @@
                 lng_registro: 'MANUAL' 
             }]);
 
-            // 2. LÓGICA DE SAÍDA AUTOMÁTICA PARA PONTO MANUAL
             if (tipo === 'ENTRADA') {
-                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
-
-                let dataSaida = new Date();
-                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
-
-                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+                const h = parseInt(hora.split(':')[0]);
+                const horaSaidaAutomatica = h < 12 ? "11:00:00" : "17:00:00";
+                const horaSaidaCravada = `${dataApenas}T${horaSaidaAutomatica}`;
 
                 await supabaseClient.from('jsp_ponto_diario').insert([{
                     funcionario_id: fId,
