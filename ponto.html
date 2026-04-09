@@ -239,10 +239,10 @@
             const dataAtual = new Date();
             const horaExata = dataAtual.toLocaleTimeString('pt-BR', { hour12: false });
             
-            // ==== CORREÇÃO DO FUSO HORÁRIO ====
-            // Pega o fuso do celular e ajusta antes de mandar pro Supabase para não somar 3 horas
-            const fusoOffset = dataAtual.getTimezoneOffset() * 60000;
-            const horaLocalParaSalvar = new Date(dataAtual.getTime() - fusoOffset).toISOString().slice(0, 19);
+          
+            
+            // O toISOString manda em formato global (UTC) e o banco gerencia o fuso automaticamente.
+            const horaLocalParaSalvar = dataAtual.toISOString();
             // ===================================
             
             const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
