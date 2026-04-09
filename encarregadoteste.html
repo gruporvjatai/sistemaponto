@@ -205,12 +205,10 @@
             
             container.innerHTML = '';
             
-            // MUDANÇA: Geração de Cards Mobile
             data.forEach(p => {
                 const func = equipeGlobal.find(e => e.id == p.funcionario_id);
                 const nomeDisplay = func ? `${func.nome.split(' ')[0]} (#${func.matricula})` : `Desconhecido`;
                 
-                // Formata hora perfeitamente
                 const dataObj = new Date(p.hora_registro);
                 const horaF = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -235,7 +233,7 @@
                         </div>
 
                         <div class="flex gap-2 mt-2 pt-3 border-t border-slate-100">
-                            <button onclick="validar('${p.id}', '${p.hora_registro}')" class="flex-1 py-2 bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-lg font-bold flex justify-center items-center gap-2 transition">
+                            <button onclick="validar('${p.id}', '${p.hora_registro}', '${p.funcionario_id}')" class="flex-1 py-2 bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-lg font-bold flex justify-center items-center gap-2 transition">
                                 <i data-lucide="check-circle" class="w-5 h-5"></i> Confirmar
                             </button>
                             <button onclick="recusar('${p.id}')" class="px-4 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white rounded-lg font-bold transition flex justify-center items-center">
@@ -248,14 +246,14 @@
             lucide.createIcons();
         }
 
-        async function validar(pontoId, horaOriginal) {
+        async function validar(pontoId, horaOriginal, funcionarioId) {
             const tipo = document.getElementById(`tipo-edit-${pontoId}`).value;
             const horaEditada = document.getElementById(`hora-edit-${pontoId}`).value;
             
-            // LÓGICA DE FUSO HORÁRIO CORRIGIDA
+            // 1. Atualiza a Entrada (Ponto que o funcionário bateu)
             let dataSalvar = new Date(horaOriginal);
             const [h, m] = horaEditada.split(':');
-            dataSalvar.setHours(h, m, 0);
+            dataSalvar.setHours(parseInt(h), parseInt(m), 0);
             
             const horaLocalCravada = getHoraLocalParaSalvar(dataSalvar);
 
@@ -264,6 +262,27 @@
                 tipo: tipo, 
                 hora_registro: horaLocalCravada 
             }).eq('id', pontoId);
+
+            // 2. LÓGICA DE SAÍDA AUTOMÁTICA
+            if (tipo === 'ENTRADA') {
+                // Se a entrada for antes das 12h, saída é 11h. Senão, saída é 17h.
+                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
+
+                let dataSaida = new Date(horaOriginal);
+                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
+
+                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+
+                await supabaseClient.from('jsp_ponto_diario').insert([{
+                    funcionario_id: funcionarioId,
+                    obra_id: obraAtualId,
+                    tipo: 'SAIDA',
+                    status: 'VALIDADO',
+                    hora_registro: horaSaidaCravada,
+                    lat_registro: 'SISTEMA_AUTO',
+                    lng_registro: 'SISTEMA_AUTO'
+                }]);
+            }
             
             carregarPendentes();
         }
@@ -287,13 +306,13 @@
             const tipo = document.getElementById('manual-tipo').value;
             if(!fId || !hora) return;
             
-            // LÓGICA DE FUSO HORÁRIO CORRIGIDA
             let dataManual = new Date(); 
             const [h, m] = hora.split(':'); 
-            dataManual.setHours(h, m, 0);
+            dataManual.setHours(parseInt(h), parseInt(m), 0);
             
             const horaLocalCravada = getHoraLocalParaSalvar(dataManual);
 
+            // 1. Salva o ponto manual
             await supabaseClient.from('jsp_ponto_diario').insert([{ 
                 funcionario_id: fId, 
                 obra_id: obraAtualId, 
@@ -303,6 +322,26 @@
                 lat_registro: 'MANUAL', 
                 lng_registro: 'MANUAL' 
             }]);
+
+            // 2. LÓGICA DE SAÍDA AUTOMÁTICA PARA PONTO MANUAL
+            if (tipo === 'ENTRADA') {
+                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
+
+                let dataSaida = new Date();
+                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
+
+                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+
+                await supabaseClient.from('jsp_ponto_diario').insert([{
+                    funcionario_id: fId,
+                    obra_id: obraAtualId,
+                    tipo: 'SAIDA',
+                    status: 'VALIDADO',
+                    hora_registro: horaSaidaCravada,
+                    lat_registro: 'MANUAL_AUTO',
+                    lng_registro: 'MANUAL_AUTO'
+                }]);
+            }
             
             fecharModalManual(); 
             carregarPendentes();
