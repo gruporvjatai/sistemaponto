@@ -1,7 +1,7 @@
 {
-  "name": "RV Sistema de Ponto",
-  "short_name": "RV Sistema de Ponto",
-  "start_url": "/folhaponto/index.html",
+  "name": "Sistema de Ponto",
+  "short_name": "Sistema de Ponto",
+  "start_url": "/sistemaponto/index.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
