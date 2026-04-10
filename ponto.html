@@ -239,18 +239,23 @@
             const dataAtual = new Date();
             const horaExata = dataAtual.toLocaleTimeString('pt-BR', { hour12: false });
             
-          
+            // --- A MÁGICA DO TEXTO PURO AQUI ---
+            // Pegamos dia, mês e ano cravados do celular
+            const ano = dataAtual.getFullYear();
+            const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataAtual.getDate()).padStart(2, '0');
             
-            // O toISOString manda em formato global (UTC) e o banco gerencia o fuso automaticamente.
-            const horaLocalParaSalvar = dataAtual.toISOString();
-            // ===================================
+            // Montamos a string exatamente como o banco e o encarregado esperam: "YYYY-MM-DD HH:mm:ss"
+            // Sem usar toISOString() para não deixar o JavaScript somar as 3 horas do fuso.
+            const horaLocalParaSalvar = `${ano}-${mes}-${dia} ${horaExata}`;
+            // -----------------------------------
             
             const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
                 funcionario_id: funcionario.id,
                 obra_id: obraId,
                 tipo: 'PENDENTE',       
                 status: 'PENDENTE',     
-                hora_registro: horaLocalParaSalvar, // Usando a hora cravada corrigida
+                hora_registro: horaLocalParaSalvar, // Agora envia o texto exato
                 lat_registro: userLat ? userLat.toString() : '',
                 lng_registro: userLng ? userLng.toString() : ''
             }]);
