@@ -114,29 +114,79 @@
         let userLng = null;
         let equipeGlobal = []; 
 
-        // O SISTEMA ARRANCA AQUI (BOOT DE ALTA VELOCIDADE)
-        window.onload = () => {
-            if (!obraId || !tokenRecebido) {
-                finalizarBootComErro("QR Code inválido. Faltam parâmetros.");
-            } else {
-                iniciarBootParalelo();
-            }
-        };
-
-        async function iniciarBootParalelo() {
-            // Promessa 1: Vai buscar o GPS (Demora por causa do satélite)
-            // Adicionado timeout para não ficar eternamente preso se o sinal for muito fraco
-            const promessaGPS = new Promise((resolve) => {
-                if (!("geolocation" in navigator)) {
-                    resolve({ sucesso: false, erro: "GPS Não Suportado." });
+        // O SISTEMA ARRANCA AQUI
+            window.onload = () => {
+                if (!obraId || !tokenRecebido) {
+                    finalizarBootComErro("QR Code inválido. Faltam parâmetros.");
                 } else {
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => resolve({ sucesso: true, lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                        (err) => resolve({ sucesso: false, erro: "GPS Desativado ou Sem Permissão." }),
-                        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-                    );
+                    iniciarBoot(); // Mudamos o nome da função aqui
                 }
-            });
+            };
+
+        async function iniciarBoot() {
+    // 1. Busca os dados no Supabase primeiro (Não depende do usuário)
+    const resultadoBD = await buscarDadosNoBanco();
+
+    // 2. Esconde o Ecrã de Loading falso imediatamente após o banco responder
+    document.getElementById('tela-loading').style.display = 'none';
+
+    // 3. Tratamento de Erro Fatal
+    if (!resultadoBD.sucesso) {
+        return finalizarBootComErro(resultadoBD.mensagem);
+    }
+
+    // 4. Monta a tela com os dados da obra
+    document.getElementById('area-funcionario').classList.remove('hidden');
+    document.getElementById('nome-obra').innerText = "📍 " + resultadoBD.obra.nome;
+    obraLatOficial = parseFloat(resultadoBD.obra.lat);
+    obraLngOficial = parseFloat(resultadoBD.obra.lng);
+    equipeGlobal = resultadoBD.equipa;
+
+    // 5. Agora sim, com a tela liberada, pedimos o GPS
+    iniciarGPS();
+}
+
+function iniciarGPS() {
+    const st = document.getElementById('gps-status');
+    st.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Solicitando acesso ao GPS... (Autorize no navegador)';
+    st.className = "mb-6 p-4 rounded-lg bg-blue-50 text-blue-800 text-sm font-bold flex items-center justify-center gap-2 border border-blue-200";
+    lucide.createIcons();
+
+    if (!("geolocation" in navigator)) {
+        mostrarErroGPS("GPS Não Suportado pelo navegador.");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            userLat = pos.coords.latitude;
+            userLng = pos.coords.longitude;
+            validarDistancia();
+        },
+        (err) => {
+            let msg = "Erro ao obter GPS.";
+            // Tratamento de erros específicos para orientar melhor o peão
+            if (err.code === err.PERMISSION_DENIED) {
+                msg = "Você negou o GPS. Libere a permissão no navegador e recarregue a página.";
+            } else if (err.code === err.POSITION_UNAVAILABLE) {
+                msg = "Sinal de GPS indisponível no momento.";
+            } else if (err.code === err.TIMEOUT) {
+                msg = "Demorou muito para encontrar o satélite. Tente ir para uma área aberta.";
+            }
+            mostrarErroGPS(msg);
+        },
+        // Aumentei o timeout para 15s para dar tempo do celular achar o satélite
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+}
+
+function mostrarErroGPS(mensagem) {
+    const st = document.getElementById('gps-status');
+    st.innerHTML = `<i data-lucide="map-pin-off" class="w-5 h-5"></i> ❌ ${mensagem}`;
+    st.className = "mb-6 p-4 rounded-lg bg-red-100 text-red-800 text-sm font-bold flex flex-col items-center gap-2 border border-red-200 text-center";
+    document.getElementById('btn-registrar').disabled = true; // Garante que o botão fique travado
+    lucide.createIcons();
+}
 
             // Promessa 2: Vai buscar os dados ao Supabase (Valida Obra, Token e carrega Equipa)
             const promessaBD = buscarDadosNoBanco();
