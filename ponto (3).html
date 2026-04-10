@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bater Ponto - RV Sistemas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="shortcut icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="application-name" content="RV Negócios">
+    <meta name="apple-mobile-web-app-title" content="RV Negócios">
+    <meta name="theme-color" content="#0f172a"> 
+    <link rel="manifest" href="manifest.json">
+
+    
+    <style>
+        #tela-loading {
+            position: fixed; inset: 0; background-color: #0f172a; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1); border-left-color: #3b82f6;
+            border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; margin-bottom: 16px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="tela-loading">
+        <div class="spinner"></div>
+        <h2 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 4px;">Validando questões de segurança...</h2>
+        <p style="font-size: 0.875rem; color: #94a3b8;">Verificando localização</p>
+    </div>
+
+    <div id="tela-erro" class="hidden w-full max-w-md bg-red-600 p-8 rounded-xl shadow-2xl text-center text-white">
+        <i data-lucide="shield-alert" class="w-20 h-20 mx-auto mb-4 text-red-200"></i>
+        <h1 class="text-2xl font-black mb-2 uppercase">Acesso Bloqueado</h1>
+        <p id="msg-erro" class="font-bold text-red-100">O QR Code lido é inválido ou já expirou.</p>
+        <p class="mt-6 text-sm">Peça ao Encarregado para gerar um novo QR Code.</p>
+    </div>
+
+    <div id="area-funcionario" class="hidden w-full max-w-md transition-all">
+        <div id="tela-registro" class="bg-white p-8 rounded-xl shadow-2xl text-center border-t-4 border-blue-600 relative overflow-hidden">
+            <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV Portal" class="h-11 mx-auto mb-4">
+            <h1 class="text-2xl font-bold mb-2 text-slate-800 uppercase">Bater Ponto</h1>
+            <p id="nome-obra" class="text-slate-500 mb-6 text-sm font-bold bg-slate-100 p-2 rounded">📍 Verificando dados da obra...</p>
+
+            <div id="gps-status" class="mb-6 p-4 rounded-lg bg-blue-50 text-blue-800 text-sm font-bold flex items-center justify-center gap-2 border border-blue-200">
+                <i data-lucide="map-pin" class="w-5 h-5 animate-bounce"></i> A aguardar sinal do GPS...
+            </div>
+
+            <div class="mb-6 text-left">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">Digite seu ID:</label>
+                <input type="number" id="funcionario-matricula" placeholder="Ex: 100" class="w-full p-4 border-2 border-slate-200 rounded-lg shadow-sm text-center text-2xl font-black outline-none focus:border-blue-600 transition-colors bg-slate-50 tracking-widest">
+            </div>
+
+            <button id="btn-registrar" onclick="registrarPontoPendente()" disabled class="w-full p-4 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-lg shadow-lg">
+                <i data-lucide="fingerprint" class="w-6 h-6"></i> REGISTAR PONTO
+            </button>
+        </div>
+
+        <div id="tela-sucesso" class="hidden bg-emerald-600 p-8 rounded-xl shadow-2xl text-center text-white relative">
+            
+            <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-12 mx-auto mb-6 opacity-70 brightness-0 invert">
+            
+            <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i data-lucide="check-circle" class="w-12 h-12 text-emerald-600"></i>
+            </div>
+            <h1 class="text-3xl font-black mb-1 uppercase tracking-tight">Ponto Registrado!</h1>
+            <!--<p class="text-emerald-100 mb-6 text-xs font-bold uppercase">Aguardando validação do encarregado.</p>-->
+            
+            <div class="bg-emerald-800/50 p-5 rounded-xl mb-6 backdrop-blur-sm border border-emerald-500/30 shadow-inner">
+                <p class="text-xs font-bold text-emerald-200 uppercase mb-1">Horário do Registro</p>
+                <p id="hora-sucesso" class="text-5xl font-black tabular-nums tracking-wider drop-shadow-md"></p>
+                <p id="data-sucesso" class="text-sm font-bold text-emerald-200 mt-1"></p>
+                <p id="nome-sucesso" class="text-sm font-black text-white mt-4 pt-4 border-t border-emerald-500/30 uppercase tracking-wide"></p>
+            </div>
+
+            <div class="mt-4 flex flex-col items-center justify-center gap-1 opacity-75">
+                <i data-lucide="camera" class="w-5 h-5 mb-1"></i>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-100">Este é seu comprovante de ponto</p>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-100">Tire um print desta tela!</p>
+            </div>
+        </div>    
+    </div>
+
+    <script>
+        // Inicialização rápida dos ícones
+        lucide.createIcons();
+
+        const SUPABASE_URL = 'https://lyieiqhkspbowsrlngvn.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const TRAVAR_POR_OBRA = true;
+        const RAIO_TOLERANCIA = 80;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const obraId = urlParams.get('obra_id'); 
+        const tokenRecebido = urlParams.get('token'); 
+        
+        let obraLatOficial = null;
+        let obraLngOficial = null;
+        let userLat = null;
+        let userLng = null;
+        let equipeGlobal = []; 
+
+        // O SISTEMA ARRANCA AQUI (BOOT DE ALTA VELOCIDADE)
+        window.onload = () => {
+            if (!obraId || !tokenRecebido) {
+                finalizarBootComErro("QR Code inválido. Faltam parâmetros.");
+            } else {
+                iniciarBootParalelo();
+            }
+        };
+
+        async function iniciarBootParalelo() {
+            // Promessa 1: Vai buscar o GPS (Demora por causa do satélite)
+            // Adicionado timeout para não ficar eternamente preso se o sinal for muito fraco
+            const promessaGPS = new Promise((resolve) => {
+                if (!("geolocation" in navigator)) {
+                    resolve({ sucesso: false, erro: "GPS Não Suportado." });
+                } else {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => resolve({ sucesso: true, lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                        (err) => resolve({ sucesso: false, erro: "GPS Desativado ou Sem Permissão." }),
+                        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                    );
+                }
+            });
+
+            // Promessa 2: Vai buscar os dados ao Supabase (Valida Obra, Token e carrega Equipa)
+            const promessaBD = buscarDadosNoBanco();
+
+            // Executa as duas tarefas ao mesmo tempo e só avança quando ambas terminarem!
+            const [resultadoGPS, resultadoBD] = await Promise.all([promessaGPS, promessaBD]);
+
+            // Esconde o Ecrã de Loading falso
+            document.getElementById('tela-loading').style.display = 'none';
+
+            // 1. Tratamento de Erro Fatal (Se o Token estiver errado, o sistema bloqueia)
+            if (!resultadoBD.sucesso) {
+                return finalizarBootComErro(resultadoBD.mensagem);
+            }
+
+            // 2. Monta o ecrã se não houve erro fatal
+            document.getElementById('area-funcionario').classList.remove('hidden');
+            document.getElementById('nome-obra').innerText = "📍 " + resultadoBD.obra.nome;
+            obraLatOficial = parseFloat(resultadoBD.obra.lat);
+            obraLngOficial = parseFloat(resultadoBD.obra.lng);
+            equipeGlobal = resultadoBD.equipa;
+
+            // 3. Verifica o resultado do GPS
+            if (!resultadoGPS.sucesso) {
+                const st = document.getElementById('gps-status');
+                st.innerHTML = '<i data-lucide="map-pin-off" class="w-5 h-5"></i> ❌ Erro: ' + resultadoGPS.erro;
+                st.className = "mb-6 p-4 rounded-lg bg-red-100 text-red-800 text-sm font-bold flex items-center gap-2 border border-red-200";
+            } else {
+                userLat = resultadoGPS.lat;
+                userLng = resultadoGPS.lng;
+                validarDistancia();
+            }
+
+            lucide.createIcons();
+        }
+
+        async function buscarDadosNoBanco() {
+            try {
+                // Busca obra e valida
+                const { data: obra, error: errorObra } = await supabaseClient
+                    .from('jsp_obras')
+                    .select('nome, lat, lng, token_diario, data_token')
+                    .eq('id', obraId)
+                    .single();
+
+                if (errorObra || !obra) return { sucesso: false, mensagem: "Obra não encontrada no servidor." };
+
+                const hoje = new Date().toLocaleDateString('en-CA'); 
+                if (obra.token_diario !== tokenRecebido || obra.data_token !== hoje) {
+                    return { sucesso: false, mensagem: "Este QR Code expirou!" };
+                }
+
+                // Carrega a equipa logo de seguida
+                const { data: equipa } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula, obra_atual_id');
+                
+                return { sucesso: true, obra: obra, equipa: equipa || [] };
+            } catch (err) {
+                return { sucesso: false, mensagem: "Falha ao conectar com o banco de dados." };
+            }
+        }
+
+        function finalizarBootComErro(mensagem) {
+            document.getElementById('tela-loading').style.display = 'none';
+            document.getElementById('area-funcionario').classList.add('hidden');
+            document.getElementById('tela-erro').classList.remove('hidden');
+            document.getElementById('msg-erro').innerText = mensagem;
+        }
+
+        function validarDistancia() {
+            const R = 6371e3; 
+            const φ1 = userLat * Math.PI/180;
+            const φ2 = obraLatOficial * Math.PI/180;
+            const Δφ = (obraLatOficial-userLat) * Math.PI/180;
+            const Δλ = (obraLngOficial-userLng) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distancia = R * c;
+
+            const statusDiv = document.getElementById('gps-status');
+
+            if (distancia <= RAIO_TOLERANCIA) { 
+                statusDiv.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i> ✅ Localização Confirmada! (${Math.round(distancia)}m)`;
+                statusDiv.className = "mb-6 p-4 rounded-lg bg-emerald-100 text-emerald-800 text-sm font-bold flex items-center justify-center gap-2 border border-emerald-200";
+                document.getElementById('btn-registrar').disabled = false;
+            } else {
+                statusDiv.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5"></i> ❌ Fora da obra (${Math.round(distancia)}m de distância).`;
+                statusDiv.className = "mb-6 p-4 rounded-lg bg-red-100 text-red-800 text-sm font-bold flex items-center gap-2 border border-red-200";
+            }
+            lucide.createIcons();
+        }
+
+        async function registrarPontoPendente() {
+            const inputDigitado = document.getElementById('funcionario-matricula').value;
+            if(!inputDigitado) return alert("Por favor, digite a sua matrícula!");
+
+            const funcionario = equipeGlobal.find(e => e.matricula == inputDigitado);
+            if(!funcionario) return alert("Matrícula não encontrada! Verifique os números.");
+
+            // ======== TRAVA DE SEGURANÇA DA OBRA ========
+            // Bloqueia o registro se o peão não pertencer à obra do QR Code lido
+            if (TRAVAR_POR_OBRA) {
+                if (funcionario.obra_atual_id != obraId) {
+                    return alert("❌ ACESSO NEGADO: Sua matrícula não está vinculada a esta obra. Procure o Encarregado!");
+                }
+            }
+            // ============================================
+
+            const btn = document.getElementById('btn-registrar');
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> A REGISTAR...';
+            btn.disabled = true;
+            lucide.createIcons();
+
+            const dataAtual = new Date();
+            const horaExata = dataAtual.toLocaleTimeString('pt-BR', { hour12: false });
+            
+            // --- A MÁGICA DO TEXTO PURO AQUI ---
+            // Pegamos dia, mês e ano cravados do celular
+            const ano = dataAtual.getFullYear();
+            const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataAtual.getDate()).padStart(2, '0');
+            
+            // Montamos a string exatamente como o banco e o encarregado esperam: "YYYY-MM-DD HH:mm:ss"
+            // Sem usar toISOString() para não deixar o JavaScript somar as 3 horas do fuso.
+            const horaLocalParaSalvar = `${ano}-${mes}-${dia} ${horaExata}`;
+            // -----------------------------------
+            
+            const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
+                funcionario_id: funcionario.id,
+                obra_id: obraId,
+                tipo: 'PENDENTE',       
+                status: 'PENDENTE',     
+                hora_registro: horaLocalParaSalvar, // Agora envia o texto exato
+                lat_registro: userLat ? userLat.toString() : '',
+                lng_registro: userLng ? userLng.toString() : ''
+            }]);
+
+            if (error) {
+                alert("Erro ao enviar: " + error.message);
+                btn.innerHTML = '<i data-lucide="fingerprint" class="w-6 h-6"></i> REGISTAR PONTO';
+                btn.disabled = false;
+            } else {
+                document.getElementById('hora-sucesso').innerText = horaExata;
+                document.getElementById('data-sucesso').innerText = dataAtual.toLocaleDateString('pt-BR');
+                document.getElementById('nome-sucesso').innerText = `${funcionario.nome} (ID: ${funcionario.matricula})`;
+                
+                document.getElementById('tela-registro').classList.add('hidden');
+                document.getElementById('tela-sucesso').classList.remove('hidden');
+                document.getElementById('funcionario-matricula').value = ''; 
+            }
+            lucide.createIcons();
+        }
+
+        
+        function voltarParaRegistro() {
+            document.getElementById('tela-sucesso').classList.add('hidden');
+            document.getElementById('tela-registro').classList.remove('hidden');
+            document.getElementById('btn-registrar').innerHTML = '<i data-lucide="fingerprint" class="w-6 h-6"></i> REGISTAR PONTO';
+            document.getElementById('btn-registrar').disabled = false;
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
