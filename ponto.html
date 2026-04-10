@@ -269,6 +269,7 @@
         }
 
         // 4. ENVIO PARA O SUPABASE
+        // 4. ENVIO PARA O SUPABASE
         async function registrarPontoPendente() {
             const inputDigitado = document.getElementById('funcionario-matricula').value;
             if(!inputDigitado) return alert("Por favor, digite a sua matrícula!");
@@ -306,14 +307,14 @@
                 btn.innerHTML = 'REGISTRAR PONTO';
                 btn.disabled = false;
             } else {
-                document.getElementById('hora-sucesso').innerText = horaExata;
-                document.getElementById('data-sucesso').innerText = dataAtual.toLocaleDateString('pt-BR');
+                // AQUI FOI CORRIGIDO: Só preenche o nome e chama a tela verde!
                 document.getElementById('nome-sucesso').innerText = `${funcionario.nome} (ID: ${funcionario.matricula})`;
                 
                 document.getElementById('tela-registro').classList.add('hidden');
                 document.getElementById('tela-sucesso').classList.remove('hidden');
                 document.getElementById('funcionario-matricula').value = ''; 
             }
+            carregarIcones(); // Atualiza os ícones caso precisem aparecer na tela nova
         }
     </script>
 </body>
