@@ -32,20 +32,19 @@
                     <i data-lucide="map-pin" class="w-4 h-4"></i>
                 </button>
             </div>
-            <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-8">
+            
+            <div class="flex items-center gap-3">
+                <button onclick="sair()" class="p-2 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg transition" title="Sair / Voltar">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+                <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-8">
+            </div>
         </div>
 
-        <div id="login-supervisor" class="max-w-xs mx-auto text-center py-8">
-            <i data-lucide="lock" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
-            <p class="text-sm font-bold text-slate-600 mb-2">Digite a senha para acessar:</p>
-            <input type="password" id="senha-supervisor" placeholder="Senha" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')" onkeyup="if(event.key === 'Enter') loginSupervisor()" class="w-full p-3 border-2 rounded-lg mb-3 text-center font-bold outline-none focus:border-blue-500">
-            <button onclick="loginSupervisor()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700">Entrar</button>
-        </div>
-
-        <div id="selecao-obra" class="hidden text-center py-4">
+        <div id="selecao-obra" class="text-center py-4">
             <p class="text-sm font-bold text-slate-600 mb-2 uppercase">Escolha a Obra:</p>
             <select id="select-obra" class="w-full p-4 border-2 rounded-lg mb-4 text-center font-bold outline-none bg-slate-50 text-lg"></select>
-            <button onclick="acessarObra()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2">
+            <button onclick="acessarObra()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
                 <i data-lucide="arrow-right-circle"></i> Gerenciar Obra
             </button>
             
@@ -91,8 +90,6 @@
                 Compartilhar Relatório do Dia
             </button>
 
-    <!-- ============================================================================================================================-->
-
     <div id="modal-manual" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="text-blue-600"></i> Ponto Manual</h3>
@@ -113,8 +110,8 @@
                     </select>
                 </div>
                 <div class="pt-2">
-                    <button onclick="salvarPontoManual()" class="w-full p-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 mb-2">Salvar Definitivo</button>
-                    <button onclick="fecharModalManual()" class="w-full p-3 bg-slate-200 text-slate-700 rounded-lg font-bold">Cancelar</button>
+                    <button onclick="salvarPontoManual()" class="w-full p-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 mb-2 transition-colors">Salvar Definitivo</button>
+                    <button onclick="fecharModalManual()" class="w-full p-3 bg-slate-200 hover:bg-slate-300 transition-colors text-slate-700 rounded-lg font-bold">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -129,19 +126,13 @@
         let obraAtualId = null;
         let equipeGlobal = [];
 
-        // FUNÇÃO AJUDANTE DE FUSO HORÁRIO BRASIL (Evita +3h no banco)
-        function getHoraLocalParaSalvar(dataObj) {
-            const fusoOffset = dataObj.getTimezoneOffset() * 60000;
-            // Retorna o formato YYYY-MM-DDTHH:mm:ss cravado na hora do seu relógio
-            return new Date(dataObj.getTime() - fusoOffset).toISOString().slice(0, 19);
-        }
+        // Carrega as obras assim que a página é aberta
+        window.onload = () => {
+            carregarObras();
+        };
 
-        function loginSupervisor() {
-            if(document.getElementById('senha-supervisor').value === '15748') {
-                document.getElementById('login-supervisor').classList.add('hidden');
-                document.getElementById('selecao-obra').classList.remove('hidden');
-                carregarObras();
-            } else { alert("Senha Incorreta!"); }
+        function sair() {
+            window.location.href = 'index.html';
         }
 
         async function carregarObras() {
@@ -177,9 +168,14 @@
             const btn = document.getElementById('btn-gerar-qr');
             btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Gerando...';
             const token = Math.random().toString(36).substring(2, 8).toUpperCase();
-            const hoje = new Date().toLocaleDateString('en-CA'); 
+            
+            const hoje = new Date();
+            const ano = hoje.getFullYear();
+            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dia = String(hoje.getDate()).padStart(2, '0');
+            const dataHojeStr = `${ano}-${mes}-${dia}`;
 
-            const { error } = await supabaseClient.from('jsp_obras').update({ token_diario: token, data_token: hoje }).eq('id', obraAtualId);
+            const { error } = await supabaseClient.from('jsp_obras').update({ token_diario: token, data_token: dataHojeStr }).eq('id', obraAtualId);
             if(error) return alert("Erro: " + error.message);
 
             const urlObj = new URL(window.location.href);
@@ -209,8 +205,14 @@
                 const func = equipeGlobal.find(e => e.id == p.funcionario_id);
                 const nomeDisplay = func ? `${func.nome.split(' ')[0]} (#${func.matricula})` : `Desconhecido`;
                 
-                const dataObj = new Date(p.hora_registro);
-                const horaF = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                let horaF = "00:00";
+                if (p.hora_registro) {
+                    if (p.hora_registro.includes('T')) {
+                        horaF = p.hora_registro.split('T')[1].substring(0, 5);
+                    } else if (p.hora_registro.includes(' ')) {
+                        horaF = p.hora_registro.split(' ')[1].substring(0, 5);
+                    }
+                }
 
                 container.innerHTML += `
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -227,8 +229,7 @@
                                 <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Tipo</label>
                                 <select id="tipo-edit-${p.id}" class="w-full p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 focus:border-blue-500 outline-none">
                                     <option value="ENTRADA">Entrada da Obra</option>
-                                    <option value="SAIDA">Saída da Obra</option>
-                                </select>
+                                    </select>
                             </div>
                         </div>
 
@@ -250,12 +251,12 @@
             const tipo = document.getElementById(`tipo-edit-${pontoId}`).value;
             const horaEditada = document.getElementById(`hora-edit-${pontoId}`).value;
             
-            // 1. Atualiza a Entrada (Ponto que o funcionário bateu)
-            let dataSalvar = new Date(horaOriginal);
-            const [h, m] = horaEditada.split(':');
-            dataSalvar.setHours(parseInt(h), parseInt(m), 0);
+            let dataApenas = "";
+            if (horaOriginal.includes('T')) dataApenas = horaOriginal.split('T')[0];
+            else if (horaOriginal.includes(' ')) dataApenas = horaOriginal.split(' ')[0];
+            else dataApenas = new Date().toISOString().split('T')[0];
             
-            const horaLocalCravada = getHoraLocalParaSalvar(dataSalvar);
+            const horaLocalCravada = `${dataApenas} ${horaEditada}:00`;
 
             await supabaseClient.from('jsp_ponto_diario').update({ 
                 status: 'VALIDADO', 
@@ -263,15 +264,10 @@
                 hora_registro: horaLocalCravada 
             }).eq('id', pontoId);
 
-            // 2. LÓGICA DE SAÍDA AUTOMÁTICA
             if (tipo === 'ENTRADA') {
-                // Se a entrada for antes das 12h, saída é 11h. Senão, saída é 17h.
-                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
-
-                let dataSaida = new Date(horaOriginal);
-                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
-
-                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+                const h = parseInt(horaEditada.split(':')[0]);
+                const horaSaidaAutomatica = h < 12 ? "11:00:00" : "17:00:00";
+                const horaSaidaCravada = `${dataApenas} ${horaSaidaAutomatica}`;
 
                 await supabaseClient.from('jsp_ponto_diario').insert([{
                     funcionario_id: funcionarioId,
@@ -296,7 +292,11 @@
 
         function abrirModalManual() { 
             document.getElementById('modal-manual').classList.remove('hidden'); 
-            document.getElementById('manual-hora').value = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); 
+            
+            const hojeLocal = new Date();
+            const h = String(hojeLocal.getHours()).padStart(2, '0');
+            const m = String(hojeLocal.getMinutes()).padStart(2, '0');
+            document.getElementById('manual-hora').value = `${h}:${m}`; 
         }
         function fecharModalManual() { document.getElementById('modal-manual').classList.add('hidden'); }
         
@@ -306,13 +306,14 @@
             const tipo = document.getElementById('manual-tipo').value;
             if(!fId || !hora) return;
             
-            let dataManual = new Date(); 
-            const [h, m] = hora.split(':'); 
-            dataManual.setHours(parseInt(h), parseInt(m), 0);
+            const hojeLocal = new Date();
+            const ano = hojeLocal.getFullYear();
+            const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
+            const dia = String(hojeLocal.getDate()).padStart(2, '0');
+            const dataApenas = `${ano}-${mes}-${dia}`;
             
-            const horaLocalCravada = getHoraLocalParaSalvar(dataManual);
+            const horaLocalCravada = `${dataApenas} ${hora}:00`;
 
-            // 1. Salva o ponto manual
             await supabaseClient.from('jsp_ponto_diario').insert([{ 
                 funcionario_id: fId, 
                 obra_id: obraAtualId, 
@@ -323,14 +324,10 @@
                 lng_registro: 'MANUAL' 
             }]);
 
-            // 2. LÓGICA DE SAÍDA AUTOMÁTICA PARA PONTO MANUAL
             if (tipo === 'ENTRADA') {
-                let horaSaidaAutomatica = parseInt(h) < 12 ? 11 : 17;
-
-                let dataSaida = new Date();
-                dataSaida.setHours(horaSaidaAutomatica, 0, 0);
-
-                const horaSaidaCravada = getHoraLocalParaSalvar(dataSaida);
+                const h = parseInt(hora.split(':')[0]);
+                const horaSaidaAutomatica = h < 12 ? "11:00:00" : "17:00:00";
+                const horaSaidaCravada = `${dataApenas} ${horaSaidaAutomatica}`;
 
                 await supabaseClient.from('jsp_ponto_diario').insert([{
                     funcionario_id: fId,
@@ -353,7 +350,6 @@
             btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Gerando Relatório...';
             lucide.createIcons();
 
-            // 1. Busca todos os registros da obra (Crescente, para mostrar Entrada antes de Saída)
             const { data, error } = await supabaseClient.from('jsp_ponto_diario')
                 .select('*')
                 .eq('obra_id', obraAtualId)
@@ -365,16 +361,16 @@
                 return;
             }
 
-            // 2. FILTRA OS DE HOJE (Cortando o texto direto, sem matemática de fuso horário)
-            // Pega a data de hoje cravada no relógio do celular: YYYY-MM-DD
             const hojeLocal = new Date();
-            const fusoOffset = hojeLocal.getTimezoneOffset() * 60000;
-            const hojeIsoStr = new Date(hojeLocal.getTime() - fusoOffset).toISOString().slice(0, 10);
-            const dataHojeBr = hojeLocal.toLocaleDateString('pt-BR');
+            const ano = hojeLocal.getFullYear();
+            const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
+            const dia = String(hojeLocal.getDate()).padStart(2, '0');
+            const dataHojeBusca = `${ano}-${mes}-${dia}`;
+            const hojeBr = `${dia}/${mes}/${ano}`;
 
             const registrosHoje = data.filter(p => {
-                // p.hora_registro vem do banco como "2026-04-07T14:30:00..."
-                return p.hora_registro.startsWith(hojeIsoStr);
+                if(!p.hora_registro) return false;
+                return p.hora_registro.startsWith(dataHojeBusca);
             });
 
             if (registrosHoje.length === 0) {
@@ -383,7 +379,6 @@
                 return;
             }
 
-            // 3. AGRUPA POR FUNCIONÁRIO
             let pontosAgrupados = {};
             registrosHoje.forEach(p => {
                 if (!pontosAgrupados[p.funcionario_id]) {
@@ -392,25 +387,25 @@
                 pontosAgrupados[p.funcionario_id].push(p);
             });
 
-            // 4. MONTA A MENSAGEM FORMATADA PARA O WHATSAPP
             const nomeObra = document.getElementById('nome-obra-titulo').innerText;
             
             let mensagem = `📋 *RELATÓRIO DE PONTO DIÁRIO*\n`;
             mensagem += `📍 *Obra:* ${nomeObra}\n`;
-            mensagem += `📅 *Data:* ${dataHojeBr}\n\n`;
+            mensagem += `📅 *Data:* ${hojeBr}\n\n`;
 
-            // Percorre cada funcionário agrupado
             Object.keys(pontosAgrupados).forEach(fId => {
                 const func = equipeGlobal.find(e => e.id == fId);
-                // Pega só o PRIMEIRO nome pra economizar espaço
                 const nomeCurto = func ? func.nome.split(' ')[0] : `ID ${fId}`; 
                 
-                mensagem += `👷 *${nomeCurto}*\n`; // Nome em negrito
+                mensagem += `👷 *${nomeCurto}*\n`; 
                 
-                // Lista os horários dessa pessoa
                 pontosAgrupados[fId].forEach(p => {
-                    // CORREÇÃO DO HORÁRIO: Corta exatamente a string HH:mm (Ex: "2026-04-07T14:30:00" vira "14:30")
-                    const horaExata = p.hora_registro.split('T')[1].substring(0, 5); 
+                    let horaExata = "00:00";
+                    if (p.hora_registro.includes('T')) {
+                        horaExata = p.hora_registro.split('T')[1].substring(0, 5);
+                    } else if (p.hora_registro.includes(' ')) {
+                        horaExata = p.hora_registro.split(' ')[1].substring(0, 5);
+                    }
                     
                     let iconeStatus = p.status === 'VALIDADO' ? '✅' : '⏳';
                     let iconeTipo = p.tipo === 'ENTRADA' ? '📥' : '📤';
@@ -419,64 +414,50 @@
                     mensagem += `  ${iconeStatus} ${iconeTipo} ${horaExata} - ${txtTipo}\n`;
                 });
                 
-                mensagem += `\n`; // Espaço entre um funcionário e outro
+                mensagem += `\n`; 
             });
 
             mensagem += `_Gerado por RV Sistemas_`;
 
-            // 5. ABRE O WHATSAPP
             const urlFormatada = encodeURIComponent(mensagem);
             window.open(`https://api.whatsapp.com/send?text=${urlFormatada}`, '_blank');
 
-            // Volta o botão ao normal
             btn.innerHTML = textoOriginal;
         }
 
         function voltarSelecaoObra() {
-            // 1. Esconde o painel da obra e o próprio botão de troca
             document.getElementById('painel-supervisor').classList.add('hidden');
             document.getElementById('btn-trocar-obra').classList.add('hidden');
-
-            // 2. Mostra a tela de seleção de obras
             document.getElementById('selecao-obra').classList.remove('hidden');
-
-            // 3. Limpa o QR Code anterior para não confundir o encarregado
             document.getElementById('area-qr-code').classList.add('hidden');
             document.getElementById('area-qr-code').classList.remove('flex');
             document.getElementById('img-qr-code').src = "";
-            
             lucide.createIcons();
         }
 
-      async function definirLocalObra() {
-            // 1. Verifica se ele escolheu alguma obra no select
+        async function definirLocalObra() {
             const sel = document.getElementById('select-obra');
             if(!sel.value) return alert("Selecione a obra no menu acima primeiro!");
 
-            // 2. Pede a senha de Administrador (Diferente da do encarregado)
             const senhaAdmin = prompt("Acesso Restrito: Digite a senha de Administrador (RV) para alterar o GPS da obra:");
             
-            // Troque 'rvadmin' pela senha forte que você quiser usar
             if(senhaAdmin !== "rvadmin") { 
                 return alert("❌ Senha Incorreta! Ação cancelada.");
             }
 
-            // 3. Pede confirmação final
             const nomeObra = sel.options[sel.selectedIndex].text;
             if(!confirm(`Atenção: Isso vai cravar a sua localização GPS atual como o ponto oficial da obra '${nomeObra}'. Deseja continuar?`)) {
                 return;
             }
 
-            // 4. Captura o GPS e Salva no Banco
             if (!("geolocation" in navigator)) return alert("Seu navegador não suporta GPS.");
 
-            alert("Buscando satélites... Aguarde!"); // Um aviso simples para ele não clicar de novo
+            alert("Buscando satélites... Aguarde!"); 
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 const novaLat = pos.coords.latitude;
                 const novaLng = pos.coords.longitude;
 
-                // Faz o UPDATE lá no Supabase
                 const { error } = await supabaseClient.from('jsp_obras')
                     .update({ lat: novaLat.toString(), lng: novaLng.toString() })
                     .eq('id', sel.value);
@@ -490,7 +471,6 @@
                 alert("❌ Erro ao buscar GPS. Verifique se a localização está ativada no celular.");
             }, { enableHighAccuracy: true });
         }
-        
     </script>
 </body>
 </html>
