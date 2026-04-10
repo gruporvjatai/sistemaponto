@@ -118,12 +118,13 @@
         };
 
         // 1. BANCO DE DADOS
-        async function carregarDadosBanco() {
+       async function carregarDadosBanco() {
             const dbStatus = document.getElementById('db-status');
             dbStatus.innerHTML = `⏳ Conectando ao servidor da RV...`;
             dbStatus.className = "mb-3 p-3 rounded-lg bg-blue-50 text-blue-800 text-xs font-bold border border-blue-200 text-center";
             
             try {
+                // Adicionando um timestamp na requisição para forçar o Supabase a não usar Cache
                 const { data: obra, error: errorObra } = await supabaseClient
                     .from('jsp_obras')
                     .select('nome, lat, lng, token_diario, data_token')
@@ -132,10 +133,29 @@
 
                 if (errorObra || !obra) throw new Error("Obra não encontrada.");
 
+                // Pega a data local do celular
                 const hoje = new Date().toLocaleDateString('en-CA'); 
-                if (obra.token_diario !== tokenRecebido || obra.data_token !== hoje) {
+                
+                // BLINDAGEM: Converte tudo para texto e remove espaços em branco das pontas
+                const tokenDaURL = String(tokenRecebido).trim();
+                const tokenDoBanco = String(obra.token_diario).trim();
+                const dataDoBanco = String(obra.data_token).trim();
+
+                // Validação rigorosa
+                if (tokenDoBanco !== tokenDaURL || dataDoBanco !== hoje) {
                     document.getElementById('area-funcionario').classList.add('hidden');
-                    document.getElementById('msg-erro').innerText = "QR Code Inválido ou Vencido.";
+                    
+                    // O X-9: Mostra na tela exatamente o que está divergindo para você debugar!
+                    document.getElementById('msg-erro').innerHTML = `
+                        QR Code Inválido ou Vencido.<br><br>
+                        <div class="text-left bg-red-800 p-3 rounded text-xs mt-2 font-mono">
+                            <strong>DIVERGÊNCIA ENCONTRADA:</strong><br>
+                            Token URL (QR Code): <span class="text-yellow-300">${tokenDaURL}</span><br>
+                            Token no Banco (DB): <span class="text-yellow-300">${tokenDoBanco}</span><br>
+                            Data Celular (Hoje): <span class="text-blue-300">${hoje}</span><br>
+                            Data no Banco (DB): <span class="text-blue-300">${dataDoBanco}</span>
+                        </div>
+                    `;
                     document.getElementById('tela-erro').classList.remove('hidden');
                     return;
                 }
@@ -153,8 +173,9 @@
                 verificarLiberacao();
             } catch (err) {
                 dbOk = false;
-                dbStatus.innerHTML = `❌ Falha na internet! <button onclick="carregarDadosBanco()" class="block mt-2 mx-auto px-4 py-2 bg-red-600 text-white rounded font-bold uppercase">Tentar Reconectar</button>`;
+                dbStatus.innerHTML = `❌ Falha na internet ou Banco! <button onclick="carregarDadosBanco()" class="block mt-2 mx-auto px-4 py-2 bg-red-600 text-white rounded font-bold uppercase">Tentar Reconectar</button>`;
                 dbStatus.className = "mb-3 p-3 rounded-lg bg-red-50 text-red-800 text-xs border border-red-200 text-center";
+                console.error(err);
             }
             carregarIcones();
         }
