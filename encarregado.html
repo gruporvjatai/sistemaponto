@@ -32,20 +32,19 @@
                     <i data-lucide="map-pin" class="w-4 h-4"></i>
                 </button>
             </div>
-            <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-8">
+            
+            <div class="flex items-center gap-3">
+                <button onclick="sair()" class="p-2 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg transition" title="Sair / Voltar">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+                <img src="https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png" alt="RV" class="h-8">
+            </div>
         </div>
 
-        <div id="login-supervisor" class="max-w-xs mx-auto text-center py-8">
-            <i data-lucide="lock" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
-            <p class="text-sm font-bold text-slate-600 mb-2">Digite a senha para acessar:</p>
-            <input type="password" id="senha-supervisor" placeholder="Senha" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')" onkeyup="if(event.key === 'Enter') loginSupervisor()" class="w-full p-3 border-2 rounded-lg mb-3 text-center font-bold outline-none focus:border-blue-500">
-            <button onclick="loginSupervisor()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700">Entrar</button>
-        </div>
-
-        <div id="selecao-obra" class="hidden text-center py-4">
+        <div id="selecao-obra" class="text-center py-4">
             <p class="text-sm font-bold text-slate-600 mb-2 uppercase">Escolha a Obra:</p>
             <select id="select-obra" class="w-full p-4 border-2 rounded-lg mb-4 text-center font-bold outline-none bg-slate-50 text-lg"></select>
-            <button onclick="acessarObra()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2">
+            <button onclick="acessarObra()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
                 <i data-lucide="arrow-right-circle"></i> Gerenciar Obra
             </button>
             
@@ -91,8 +90,6 @@
                 Compartilhar Relatório do Dia
             </button>
 
-    <!-- ============================================================================================================================-->
-
     <div id="modal-manual" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="text-blue-600"></i> Ponto Manual</h3>
@@ -113,8 +110,8 @@
                     </select>
                 </div>
                 <div class="pt-2">
-                    <button onclick="salvarPontoManual()" class="w-full p-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 mb-2">Salvar Definitivo</button>
-                    <button onclick="fecharModalManual()" class="w-full p-3 bg-slate-200 text-slate-700 rounded-lg font-bold">Cancelar</button>
+                    <button onclick="salvarPontoManual()" class="w-full p-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 mb-2 transition-colors">Salvar Definitivo</button>
+                    <button onclick="fecharModalManual()" class="w-full p-3 bg-slate-200 hover:bg-slate-300 transition-colors text-slate-700 rounded-lg font-bold">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -129,12 +126,13 @@
         let obraAtualId = null;
         let equipeGlobal = [];
 
-        function loginSupervisor() {
-            if(document.getElementById('senha-supervisor').value === '15748') {
-                document.getElementById('login-supervisor').classList.add('hidden');
-                document.getElementById('selecao-obra').classList.remove('hidden');
-                carregarObras();
-            } else { alert("Senha Incorreta!"); }
+        // Carrega as obras assim que a página é aberta
+        window.onload = () => {
+            carregarObras();
+        };
+
+        function sair() {
+            window.location.href = 'index.html';
         }
 
         async function carregarObras() {
@@ -207,7 +205,6 @@
                 const func = equipeGlobal.find(e => e.id == p.funcionario_id);
                 const nomeDisplay = func ? `${func.nome.split(' ')[0]} (#${func.matricula})` : `Desconhecido`;
                 
-                // MÁGICA 1: Pega a hora exata direto do texto que veio do banco, ignorando o fuso do navegador!
                 let horaF = "00:00";
                 if (p.hora_registro) {
                     if (p.hora_registro.includes('T')) {
@@ -232,8 +229,7 @@
                                 <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Tipo</label>
                                 <select id="tipo-edit-${p.id}" class="w-full p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 focus:border-blue-500 outline-none">
                                     <option value="ENTRADA">Entrada da Obra</option>
-                                    <!--<option value="SAIDA">Saída da Obra</option>-->
-                                </select>
+                                    </select>
                             </div>
                         </div>
 
@@ -255,13 +251,11 @@
             const tipo = document.getElementById(`tipo-edit-${pontoId}`).value;
             const horaEditada = document.getElementById(`hora-edit-${pontoId}`).value;
             
-            // MÁGICA 2: Corta a data do texto e cola com a hora exata da tela
             let dataApenas = "";
             if (horaOriginal.includes('T')) dataApenas = horaOriginal.split('T')[0];
             else if (horaOriginal.includes(' ')) dataApenas = horaOriginal.split(' ')[0];
             else dataApenas = new Date().toISOString().split('T')[0];
             
-            // Usamos espaço em vez de 'T' para o banco aceitar como texto local cravado
             const horaLocalCravada = `${dataApenas} ${horaEditada}:00`;
 
             await supabaseClient.from('jsp_ponto_diario').update({ 
@@ -406,7 +400,6 @@
                 mensagem += `👷 *${nomeCurto}*\n`; 
                 
                 pontosAgrupados[fId].forEach(p => {
-                    // MÁGICA 3: Corta direto do texto para o Zap ficar impecável
                     let horaExata = "00:00";
                     if (p.hora_registro.includes('T')) {
                         horaExata = p.hora_registro.split('T')[1].substring(0, 5);
@@ -442,7 +435,7 @@
             lucide.createIcons();
         }
 
-      async function definirLocalObra() {
+        async function definirLocalObra() {
             const sel = document.getElementById('select-obra');
             if(!sel.value) return alert("Selecione a obra no menu acima primeiro!");
 
