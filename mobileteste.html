@@ -178,21 +178,62 @@
     </div>
 
     <script>
-        // ====== CONEXÃO E ESTADO ======
+               // ====== CONEXÃO E ESTADO ======
         let dadosUsuario = null;
         const userSessao = localStorage.getItem('rv_user');
-        if (!userSessao) window.location.replace('index.html');
-        else dadosUsuario = JSON.parse(userSessao);
-
+        
         const supabaseUrl = 'https://lyieiqhkspbowsrlngvn.supabase.co'; 
         const supabaseKey = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
         const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
 
         let STATE = { obras: [], equipe: [] };
 
-        window.onload = function() { 
-            if (dadosUsuario) { showLoading(true); loadData(); }
-            lucide.createIcons();          
+        window.onload = async function() { 
+            // 1. Verifica se tem sessão salva
+            if (!userSessao) {
+                window.location.replace('index.html');
+                return;
+            }
+            
+            try {
+                dadosUsuario = JSON.parse(userSessao);
+                
+                // 2. Verifica se o usuário ainda existe e está ativo no banco
+                const { data: userDB, error } = await sb
+                    .from('jsp_usuarios')
+                    .select('*')
+                    .eq('id', dadosUsuario.id)
+                    .eq('ativo', true)
+                    .single();
+                
+                if (error || !userDB) {
+                    // Usuário não encontrado ou inativo - limpa e redireciona
+                    localStorage.removeItem('rv_user');
+                    window.location.replace('index.html');
+                    return;
+                }
+                
+                // 3. Verifica se a senha não foi alterada (segurança extra)
+                if (userDB.senha !== dadosUsuario.senha) {
+                    localStorage.removeItem('rv_user');
+                    window.location.replace('index.html');
+                    return;
+                }
+                
+                // 4. Atualiza os dados do usuário com as informações mais recentes do banco
+                dadosUsuario = userDB;
+                
+                // 5. Continua carregando o sistema
+                showLoading(true); 
+                loadData();
+                lucide.createIcons();
+                
+            } catch (e) {
+                // Se der qualquer erro, limpa e volta pro login
+                console.error("Erro na validação:", e);
+                localStorage.removeItem('rv_user');
+                window.location.replace('index.html');
+            }
         };
 
         // ====== UTILITÁRIOS ======
@@ -430,7 +471,10 @@
             loadData();
         }
 
-        function fazerLogout() { localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
+        function fazerLogout() { 
+    localStorage.removeItem('rv_user'); 
+    window.location.replace('index.html'); 
+}
     </script>
   </body>
 </html>
