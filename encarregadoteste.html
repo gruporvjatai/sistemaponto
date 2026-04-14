@@ -393,13 +393,21 @@
     mensagem += `📍 *Obra:* ${nomeObra}\n`;
     mensagem += `📅 *Data:* ${hojeBr}\n\n`;
 
-    Object.keys(pontosAgrupados).forEach(fId => {
-        const func = equipeGlobal.find(e => e.id == fId);
-        
-        // AQUI: Nome completo do funcionário
-        const nomeCompleto = func ? func.nome : `ID ${fId}`;
-        
-        mensagem += `👷 *${nomeCompleto}*\n`; 
+            Object.keys(pontosAgrupados).forEach(fId => {
+            const func = equipeGlobal.find(e => e.id == fId);
+            
+            // NOVA LÓGICA: Pega primeiro e segundo nome
+            let nomeCurto = `ID ${fId}`;
+            if (func && func.nome) {
+                const partes = func.nome.trim().split(/\s+/); // Divide por espaços
+                if (partes.length >= 2) {
+                    nomeCurto = `${partes[0]} ${partes[1]}`;
+                } else {
+                    nomeCurto = func.nome;
+                }
+            }
+            
+            mensagem += `👷 *${nomeCurto}*\n`; 
         
         pontosAgrupados[fId].forEach(p => {
             let horaExata = "00:00";
