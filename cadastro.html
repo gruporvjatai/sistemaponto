@@ -117,11 +117,6 @@
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Endereço</label>
                     <input type="text" id="eqp-endereco" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700">
                 </div>
-
-                <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Chave PIX</label>
-                    <input type="text" id="eqp-chave_pix" placeholder="Celular, CPF, E-mail ou Aleatória" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700 font-bold">
-                </div>
                 
                 <div class="flex gap-2">
                     <div class="w-1/2">
@@ -148,6 +143,12 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Obra Alocada (Opcional)</label>
                     <select id="eqp-obra_atual_id" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 outline-none focus:border-blue-500"></select>
+                </div>
+                
+                <!-- NOVO CAMPO: DATA DE CONTRATO -->
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Data de Contrato</label>
+                    <input type="date" id="eqp-data_contrato" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 font-bold text-slate-700">
                 </div>
                 
                 <button type="submit" class="w-full p-4 bg-blue-700 hover:bg-blue-800 transition-colors text-white rounded-xl font-black mt-4 shadow-lg active:scale-95 flex justify-center items-center gap-2">
@@ -256,9 +257,11 @@
             const htmlObras = '<option value="">Todas Obras</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             
+            // Obras na Equipe (Form)
             const eqpObra = document.getElementById('eqp-obra_atual_id'); 
             if(eqpObra && !eqpObra.value) eqpObra.innerHTML = htmlObrasStrict;
 
+            // Obras na Equipe (Filtro)
             const eqpFilterObra = document.getElementById('eqp-filter-obra');
             if(eqpFilterObra) { const cVal = eqpFilterObra.value; eqpFilterObra.innerHTML = htmlObras; if(cVal) eqpFilterObra.value = cVal; }
         }
@@ -289,6 +292,7 @@
                 const nomeObra = obra ? obra.nome : 'Sem obra alocada';
                 const isAtivo = e.ativo === true || e.ativo === 'true'; 
 
+                // Lógica pro botão do WhatsApp
                 let zapBtn = '';
                 if(e.telefone) {
                     const numZap = e.telefone.replace(/\D/g, ''); 
@@ -321,7 +325,7 @@
             lucide.createIcons();
         }
 
-        function openEquipeForm(id) {
+               function openEquipeForm(id) {
             if(id) {
                 const e = STATE.equipe.find(x => x.id == id); 
                 document.getElementById('eqp-id').value = e.id;
@@ -330,21 +334,23 @@
                 document.getElementById('eqp-rg').value = e.rg || '';
                 document.getElementById('eqp-telefone').value = e.telefone || '';
                 document.getElementById('eqp-endereco').value = e.endereco || '';
-                document.getElementById('eqp-chave_pix').value = e.chave_pix || ''; // Carrega a Chave PIX
                 document.getElementById('eqp-valor_diaria').value = e.valor_diaria || '';
                 document.getElementById('eqp-categoria').value = e.categoria || 'Servente';
                 document.getElementById('eqp-ativo').value = (e.ativo === true || e.ativo === 'true') ? 'true' : 'false';
                 document.getElementById('eqp-obra_atual_id').value = e.obra_atual_id || '';
+                // NOVA LINHA: Carrega a data de contrato
+                document.getElementById('eqp-data_contrato').value = e.data_contrato || '';
             } else { 
                 document.getElementById('equipe-form-container').querySelector('form').reset(); 
                 document.getElementById('eqp-id').value = ''; 
-                document.getElementById('eqp-chave_pix').value = ''; // Limpa a Chave PIX
                 document.getElementById('eqp-categoria').value = 'Servente';
                 document.getElementById('eqp-ativo').value = 'true';
+                // NOVA LINHA: Limpa o campo de data no novo cadastro
+                document.getElementById('eqp-data_contrato').value = '';
             }
             openOverlayForm('equipe-form-container');
         }
-
+        // Gerador de ID universal (Funciona no PC e no Mobile)
         function gerarIdSeguro() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
                 return crypto.randomUUID();
@@ -355,10 +361,11 @@
             });
         }
 
-        async function saveEquipe(e) {
+               async function saveEquipe(e) {
             e.preventDefault(); 
             showLoading(true);
 
+            // Lê o HTML com segurança
             const getV = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value : '';
@@ -374,15 +381,17 @@
                 cpf: getV('eqp-cpf'),
                 rg: getV('eqp-rg'),
                 endereco: getV('eqp-endereco'),
-                chave_pix: getV('eqp-chave_pix'), // Salva a Chave PIX
                 obra_atual_id: getV('eqp-obra_atual_id') || null,
                 valor_diaria: parseFloat(getV('eqp-valor_diaria')) || 0,
-                ativo: getV('eqp-ativo') === 'true'
+                ativo: getV('eqp-ativo') === 'true',
+                // NOVA LINHA: Campo data_contrato
+                data_contrato: getV('eqp-data_contrato') || null
             };
             
             if(isNew) {
                 payload.id = gerarIdSeguro();
                 
+                // Calcula a Matrícula Sequencial automaticamente
                 let maxMat = 0;
                 if (STATE.equipe && STATE.equipe.length > 0) {
                     STATE.equipe.forEach(item => {
