@@ -150,19 +150,37 @@
             document.getElementById('selecao-obra').classList.add('hidden');
             document.getElementById('painel-supervisor').classList.remove('hidden');
             document.getElementById('btn-trocar-obra').classList.remove('hidden');
-            await carregarEquipe();
+            await carregarEquipePorObra();
             carregarPendentes();
         }
 
-        async function carregarEquipe() {
-            const { data } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula').order('nome');
-            const selectManual = document.getElementById('manual-funcionario');
-            selectManual.innerHTML = '';
-            if (data) {
-                equipeGlobal = data;
-                data.forEach(f => selectManual.innerHTML += `<option value="${f.id}">${f.nome} (ID: ${f.matricula})</option>`);
+       async function carregarEquipePorObra() {
+                const selectManual = document.getElementById('manual-funcionario');
+                selectManual.innerHTML = '<option value="">Carregando...</option>';
+                
+                const { data, error } = await supabaseClient
+                    .from('jsp_equipe')
+                    .select('id, nome, matricula')
+                    .eq('obra_atual_id', obraAtualId)
+                    .eq('ativo', true)
+                    .order('nome');
+                
+                if (error) {
+                    console.error("Erro ao carregar equipe:", error);
+                    selectManual.innerHTML = '<option value="">Erro ao carregar</option>';
+                    return;
+                }
+                
+                selectManual.innerHTML = '';
+                if (data && data.length > 0) {
+                    equipeGlobal = data;
+                    data.forEach(f => {
+                        selectManual.innerHTML += `<option value="${f.id}">${f.nome} (ID: ${f.matricula})</option>`;
+                    });
+                } else {
+                    selectManual.innerHTML = '<option value="">Nenhum funcionário ativo nesta obra</option>';
+                }
             }
-        }
 
         async function gerarQrCodeDoDia() {
             const btn = document.getElementById('btn-gerar-qr');
