@@ -536,7 +536,15 @@
         mensagem += `\n_Relatório gerado por RV Sistemas_`;
 
         const urlFormatada = encodeURIComponent(mensagem);
-        window.open(`https://api.whatsapp.com/send?text=${urlFormatada}`, '_blank');
+        const webLink = `https://api.whatsapp.com/send?text=${urlFormatada}`;
+        const appLink = `whatsapp://send?text=${urlFormatada}`;
+        
+        // Tenta abrir com o esquema nativo primeiro (funciona em apps mais antigos)
+        const newWindow = window.open(appLink, '_blank');
+        if (!newWindow || newWindow.closed) {
+            // Se falhar, abre o link universal
+            window.open(webLink, '_blank');
+        }
 
     } catch (err) {
         alert("Erro ao gerar relatório: " + err.message);
