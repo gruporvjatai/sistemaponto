@@ -148,7 +148,7 @@
                 </div>
 
                 <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Obra Alocada (Opcional)</label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Obra Alocada <span class="text-red-500">*</span></label>
                     <select id="eqp-obra_atual_id" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 outline-none focus:border-blue-500"></select>
                 </div>
                 
@@ -258,7 +258,8 @@
 
         function updateSelects() {
             const htmlObras = '<option value="">Todas Obras</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
-            const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
+            //const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
+            const htmlObrasStrict = '<option value="" disabled selected>-- Selecione uma obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             
             const eqpObra = document.getElementById('eqp-obra_atual_id'); 
             if(eqpObra && !eqpObra.value) eqpObra.innerHTML = htmlObrasStrict;
@@ -368,7 +369,7 @@
     };
 
     // Validação extra de campos obrigatórios
-    const camposObrigatorios = ['eqp-nome', 'eqp-cpf', 'eqp-telefone', 'eqp-endereco', 'eqp-chave_pix', 'eqp-valor_diaria'];
+    const camposObrigatorios = ['eqp-nome', 'eqp-cpf', 'eqp-telefone', 'eqp-endereco', 'eqp-chave_pix', 'eqp-valor_diaria', 'eqp-obra_atual_id'];
     for (let campo of camposObrigatorios) {
         if (!getV(campo)) {
             showToast(`Preencha o campo ${campo.replace('eqp-', '').replace('_', ' ')}`, true);
