@@ -259,7 +259,7 @@
         function updateSelects() {
             const htmlObras = '<option value="">Todas Obras</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             //const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
-            const htmlObrasStrict = '<option value="" disabled selected>-- Selecione uma obra --</option>' + STATE.obras.map(...);
+            const htmlObrasStrict = '<option value="" disabled selected>-- Selecione uma obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             
             const eqpObra = document.getElementById('eqp-obra_atual_id'); 
             if(eqpObra && !eqpObra.value) eqpObra.innerHTML = htmlObrasStrict;
