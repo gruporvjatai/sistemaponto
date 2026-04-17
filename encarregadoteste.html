@@ -168,6 +168,7 @@
                 if (error) {
                     console.error("Erro ao carregar equipe:", error);
                     selectManual.innerHTML = '<option value="">Erro ao carregar</option>';
+                    equipeGlobal = []; // garante array vazio em caso de erro
                     return;
                 }
                 
@@ -179,6 +180,7 @@
                     });
                 } else {
                     selectManual.innerHTML = '<option value="">Nenhum funcionário ativo nesta obra</option>';
+                    equipeGlobal = [];
                 }
             }
 
@@ -413,97 +415,115 @@
         lucide.createIcons();
     }
 }
-        async function compartilharRelatorioWhatsApp() {
-    const btn = document.getElementById('btn-whatsapp');
-    const textoOriginal = btn.innerHTML;
-    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Gerando Relatório...';
-    lucide.createIcons();
-
-    const { data, error } = await supabaseClient.from('jsp_ponto_diario')
-        .select('*')
-        .eq('obra_id', obraAtualId)
-        .order('hora_registro', { ascending: true });
-
-    if (error) {
-        alert("Erro ao gerar relatório: " + error.message);
-        btn.innerHTML = textoOriginal;
-        return;
-    }
-
-    const hojeLocal = new Date();
-    const ano = hojeLocal.getFullYear();
-    const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
-    const dia = String(hojeLocal.getDate()).padStart(2, '0');
-    const dataHojeBusca = `${ano}-${mes}-${dia}`;
-    const hojeBr = `${dia}/${mes}/${ano}`;
-
-    const registrosHoje = data.filter(p => {
-        if(!p.hora_registro) return false;
-        return p.hora_registro.startsWith(dataHojeBusca);
-    });
-
-    if (registrosHoje.length === 0) {
-        alert("Nenhum registro encontrado para a data de hoje.");
-        btn.innerHTML = textoOriginal;
-        return;
-    }
-
-    let pontosAgrupados = {};
-    registrosHoje.forEach(p => {
-        if (!pontosAgrupados[p.funcionario_id]) {
-            pontosAgrupados[p.funcionario_id] = [];
-        }
-        pontosAgrupados[p.funcionario_id].push(p);
-    });
-
-    const nomeObra = document.getElementById('nome-obra-titulo').innerText;
-    
-    let mensagem = `📋 *RELATÓRIO DE PONTO DIÁRIO*\n`;
-    mensagem += `📍 *Obra:* ${nomeObra}\n`;
-    mensagem += `📅 *Data:* ${hojeBr}\n\n`;
-
-            Object.keys(pontosAgrupados).forEach(fId => {
-            const func = equipeGlobal.find(e => e.id == fId);
+       async function compartilharRelatorioWhatsApp() {
+                const btn = document.getElementById('btn-whatsapp');
+                const textoOriginal = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Gerando Relatório...';
+                lucide.createIcons();
             
-            // NOVA LÓGICA: Pega primeiro e segundo nome
-            let nomeCurto = `ID ${fId}`;
-            if (func && func.nome) {
-                const partes = func.nome.trim().split(/\s+/); // Divide por espaços
-                if (partes.length >= 2) {
-                    nomeCurto = `${partes[0]} ${partes[1]}`;
-                } else {
-                    nomeCurto = func.nome;
+                try {
+                    // Garante que temos a lista de funcionários atualizada
+                    if (!equipeGlobal || equipeGlobal.length === 0) {
+                        await carregarEquipePorObra();
+                    }
+            
+                    const hoje = new Date();
+                    const ano = hoje.getFullYear();
+                    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                    const dia = String(hoje.getDate()).padStart(2, '0');
+                    const dataHojeBusca = `${ano}-${mes}-${dia}`;
+                    const hojeBr = `${dia}/${mes}/${ano}`;
+            
+                    const { data: registros, error } = await supabaseClient
+                        .from('jsp_ponto_diario')
+                        .select('*')
+                        .eq('obra_id', obraAtualId)
+                        .order('hora_registro', { ascending: true });
+            
+                    if (error) throw error;
+            
+                    const registrosHoje = registros.filter(p => {
+                        if (!p.hora_registro) return false;
+                        return p.hora_registro.startsWith(dataHojeBusca);
+                    });
+            
+                    const pontoPorFuncionario = {};
+                    registrosHoje.forEach(p => {
+                        if (!pontoPorFuncionario[p.funcionario_id]) {
+                            pontoPorFuncionario[p.funcionario_id] = [];
+                        }
+                        pontoPorFuncionario[p.funcionario_id].push(p);
+                    });
+            
+                    const funcionariosAtivos = equipeGlobal;
+                    const nomeObra = document.getElementById('nome-obra-titulo').innerText;
+            
+                    let mensagem = `📋 *RELATÓRIO DE PONTO DIÁRIO*\n`;
+                    mensagem += `📍 *Obra:* ${nomeObra}\n`;
+                    mensagem += `📅 *Data:* ${hojeBr}\n\n`;
+            
+                    mensagem += `✅ *FUNCIONÁRIOS QUE BATERAM PONTO HOJE:*\n`;
+                    const faltantes = [];
+            
+                    funcionariosAtivos.forEach(func => {
+                        const pontos = pontoPorFuncionario[func.id] || [];
+                        
+                        if (pontos.length > 0) {
+                            let nomeCurto = func.nome;
+                            const partes = func.nome.trim().split(/\s+/);
+                            if (partes.length >= 2) {
+                                nomeCurto = `${partes[0]} ${partes[1]}`;
+                            }
+                            
+                            mensagem += `\n👷 *${nomeCurto}* (ID: ${func.matricula})\n`;
+                            
+                            pontos.sort((a, b) => new Date(a.hora_registro) - new Date(b.hora_registro));
+                            
+                            pontos.forEach(p => {
+                                let horaExata = "00:00";
+                                if (p.hora_registro.includes('T')) {
+                                    horaExata = p.hora_registro.split('T')[1].substring(0, 5);
+                                } else if (p.hora_registro.includes(' ')) {
+                                    horaExata = p.hora_registro.split(' ')[1].substring(0, 5);
+                                }
+                                
+                                const iconeStatus = p.status === 'VALIDADO' ? '✅' : '⏳';
+                                const iconeTipo = p.tipo === 'ENTRADA' ? '📥' : (p.tipo === 'SAIDA' ? '📤' : '📝');
+                                const txtTipo = p.tipo === 'ENTRADA' ? 'Entrada' : (p.tipo === 'SAIDA' ? 'Saída' : 'Ajuste');
+                                
+                                mensagem += `   ${iconeStatus} ${iconeTipo} ${horaExata} - ${txtTipo}\n`;
+                            });
+                        } else {
+                            faltantes.push(func);
+                        }
+                    });
+            
+                    if (faltantes.length > 0) {
+                        mensagem += `\n❌ *FUNCIONÁRIOS QUE NÃO BATERAM PONTO HOJE:*\n`;
+                        faltantes.forEach(func => {
+                            let nomeCurto = func.nome;
+                            const partes = func.nome.trim().split(/\s+/);
+                            if (partes.length >= 2) {
+                                nomeCurto = `${partes[0]} ${partes[1]}`;
+                            }
+                            mensagem += `   • ${nomeCurto} (ID: ${func.matricula})\n`;
+                        });
+                    } else {
+                        mensagem += `\n🎉 *TODOS OS FUNCIONÁRIOS BATERAM PONTO HOJE!*\n`;
+                    }
+            
+                    mensagem += `\n_Relatório gerado por RV Sistemas_`;
+            
+                    const urlFormatada = encodeURIComponent(mensagem);
+                    window.open(`https://api.whatsapp.com/send?text=${urlFormatada}`, '_blank');
+            
+                } catch (err) {
+                    alert("Erro ao gerar relatório: " + err.message);
+                } finally {
+                    btn.innerHTML = textoOriginal;
+                    lucide.createIcons();
                 }
             }
-            
-            mensagem += `👷 *${nomeCurto}*\n`; 
-        
-        pontosAgrupados[fId].forEach(p => {
-            let horaExata = "00:00";
-            if (p.hora_registro.includes('T')) {
-                horaExata = p.hora_registro.split('T')[1].substring(0, 5);
-            } else if (p.hora_registro.includes(' ')) {
-                horaExata = p.hora_registro.split(' ')[1].substring(0, 5);
-            }
-            
-            let iconeStatus = p.status === 'VALIDADO' ? '✅' : '⏳';
-            let iconeTipo = p.tipo === 'ENTRADA' ? '📥' : '📤';
-            let txtTipo = p.tipo === 'ENTRADA' ? 'Entrada' : 'Saída';
-            
-            mensagem += `  ${iconeStatus} ${iconeTipo} ${horaExata} - ${txtTipo}\n`;
-        });
-        
-        mensagem += `\n`; 
-    });
-
-    mensagem += `_Gerado por RV Sistemas_`;
-
-    const urlFormatada = encodeURIComponent(mensagem);
-    window.open(`https://api.whatsapp.com/send?text=${urlFormatada}`, '_blank');
-
-    btn.innerHTML = textoOriginal;
-    lucide.createIcons();
-}
 
         function voltarSelecaoObra() {
             document.getElementById('painel-supervisor').classList.add('hidden');
