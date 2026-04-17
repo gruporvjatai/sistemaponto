@@ -117,6 +117,11 @@
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Endereço</label>
                     <input type="text" id="eqp-endereco" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700">
                 </div>
+
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Chave PIX</label>
+                    <input type="text" id="eqp-chave_pix" placeholder="Celular, CPF, E-mail ou Aleatória" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700 font-bold">
+                </div>
                 
                 <div class="flex gap-2">
                     <div class="w-1/2">
@@ -143,12 +148,6 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Obra Alocada (Opcional)</label>
                     <select id="eqp-obra_atual_id" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 outline-none focus:border-blue-500"></select>
-                </div>
-                
-                <!-- NOVO CAMPO: DATA DE CONTRATO -->
-                <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Data de Contrato</label>
-                    <input type="date" id="eqp-data_contrato" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 font-bold text-slate-700">
                 </div>
                 
                 <button type="submit" class="w-full p-4 bg-blue-700 hover:bg-blue-800 transition-colors text-white rounded-xl font-black mt-4 shadow-lg active:scale-95 flex justify-center items-center gap-2">
@@ -257,11 +256,9 @@
             const htmlObras = '<option value="">Todas Obras</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             
-            // Obras na Equipe (Form)
             const eqpObra = document.getElementById('eqp-obra_atual_id'); 
             if(eqpObra && !eqpObra.value) eqpObra.innerHTML = htmlObrasStrict;
 
-            // Obras na Equipe (Filtro)
             const eqpFilterObra = document.getElementById('eqp-filter-obra');
             if(eqpFilterObra) { const cVal = eqpFilterObra.value; eqpFilterObra.innerHTML = htmlObras; if(cVal) eqpFilterObra.value = cVal; }
         }
@@ -292,7 +289,6 @@
                 const nomeObra = obra ? obra.nome : 'Sem obra alocada';
                 const isAtivo = e.ativo === true || e.ativo === 'true'; 
 
-                // Lógica pro botão do WhatsApp
                 let zapBtn = '';
                 if(e.telefone) {
                     const numZap = e.telefone.replace(/\D/g, ''); 
@@ -325,7 +321,7 @@
             lucide.createIcons();
         }
 
-               function openEquipeForm(id) {
+        function openEquipeForm(id) {
             if(id) {
                 const e = STATE.equipe.find(x => x.id == id); 
                 document.getElementById('eqp-id').value = e.id;
@@ -334,23 +330,21 @@
                 document.getElementById('eqp-rg').value = e.rg || '';
                 document.getElementById('eqp-telefone').value = e.telefone || '';
                 document.getElementById('eqp-endereco').value = e.endereco || '';
+                document.getElementById('eqp-chave_pix').value = e.chave_pix || ''; // Carrega a Chave PIX
                 document.getElementById('eqp-valor_diaria').value = e.valor_diaria || '';
                 document.getElementById('eqp-categoria').value = e.categoria || 'Servente';
                 document.getElementById('eqp-ativo').value = (e.ativo === true || e.ativo === 'true') ? 'true' : 'false';
                 document.getElementById('eqp-obra_atual_id').value = e.obra_atual_id || '';
-                // NOVA LINHA: Carrega a data de contrato
-                document.getElementById('eqp-data_contrato').value = e.data_contrato || '';
             } else { 
                 document.getElementById('equipe-form-container').querySelector('form').reset(); 
                 document.getElementById('eqp-id').value = ''; 
+                document.getElementById('eqp-chave_pix').value = ''; // Limpa a Chave PIX
                 document.getElementById('eqp-categoria').value = 'Servente';
                 document.getElementById('eqp-ativo').value = 'true';
-                // NOVA LINHA: Limpa o campo de data no novo cadastro
-                document.getElementById('eqp-data_contrato').value = '';
             }
             openOverlayForm('equipe-form-container');
         }
-        // Gerador de ID universal (Funciona no PC e no Mobile)
+
         function gerarIdSeguro() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
                 return crypto.randomUUID();
@@ -361,127 +355,71 @@
             });
         }
 
-               async function saveEquipe(e) {
-    e.preventDefault(); 
-    showLoading(true);
+        async function saveEquipe(e) {
+            e.preventDefault(); 
+            showLoading(true);
 
-    // Lê os campos do formulário
-    const getV = (id) => {
-        const el = document.getElementById(id);
-        return el ? el.value : '';
-    };
+            const getV = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : '';
+            };
 
-    const nome = getV('eqp-nome').trim();
-    const cpf = getV('eqp-cpf').trim();
-    const telefone = getV('eqp-telefone').trim();
-    const valorDiaria = getV('eqp-valor_diaria').trim();
-    const obraId = getV('eqp-obra_atual_id');
+            const idAtual = getV('eqp-id');
+            const isNew = !idAtual;
 
-    // ========== VALIDAÇÕES OBRIGATÓRIAS ==========
-    if (!nome) {
-        showLoading(false);
-        showToast("❌ O campo NOME é obrigatório.", true);
-        return;
-    }
-    if (!cpf) {
-        showLoading(false);
-        showToast("❌ O campo CPF é obrigatório.", true);
-        return;
-    }
-    // Remove pontos e traço para verificar se tem pelo menos 11 dígitos
-    const cpfLimpo = cpf.replace(/\D/g, '');
-    if (cpfLimpo.length !== 11) {
-        showLoading(false);
-        showToast("❌ CPF inválido. Digite 11 números (ex: 123.456.789-00).", true);
-        return;
-    }
-    if (!telefone) {
-        showLoading(false);
-        showToast("❌ O campo TELEFONE é obrigatório.", true);
-        return;
-    }
-    const foneLimpo = telefone.replace(/\D/g, '');
-    if (foneLimpo.length < 10) {
-        showLoading(false);
-        showToast("❌ Telefone inválido. Digite DDD + número (ex: 11999999999).", true);
-        return;
-    }
-    if (!valorDiaria) {
-        showLoading(false);
-        showToast("❌ O campo VALOR DA DIÁRIA é obrigatório.", true);
-        return;
-    }
-    const valorNum = parseFloat(valorDiaria);
-    if (isNaN(valorNum) || valorNum <= 0) {
-        showLoading(false);
-        showToast("❌ Digite um valor de diária válido (maior que zero).", true);
-        return;
-    }
-    if (!obraId) {
-        showLoading(false);
-        showToast("❌ Selecione o LOCAL DA OBRA (obra alocada).", true);
-        return;
-    }
+            const payload = {
+                nome: getV('eqp-nome'),
+                categoria: getV('eqp-categoria'),
+                telefone: getV('eqp-telefone'),
+                cpf: getV('eqp-cpf'),
+                rg: getV('eqp-rg'),
+                endereco: getV('eqp-endereco'),
+                chave_pix: getV('eqp-chave_pix'), // Salva a Chave PIX
+                obra_atual_id: getV('eqp-obra_atual_id') || null,
+                valor_diaria: parseFloat(getV('eqp-valor_diaria')) || 0,
+                ativo: getV('eqp-ativo') === 'true'
+            };
+            
+            if(isNew) {
+                payload.id = gerarIdSeguro();
+                
+                let maxMat = 0;
+                if (STATE.equipe && STATE.equipe.length > 0) {
+                    STATE.equipe.forEach(item => {
+                        let m = parseInt(item.matricula);
+                        if (!isNaN(m) && m > maxMat) maxMat = m;
+                    });
+                }
+                payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
+                payload.contrato_assinado = false;
+            } else {
+                payload.id = idAtual;
+            }
 
-    // ========== PREPARA OS DADOS ==========
-    const idAtual = getV('eqp-id');
-    const isNew = !idAtual;
-
-    const payload = {
-        nome: nome,
-        categoria: getV('eqp-categoria'),
-        telefone: telefone,
-        cpf: cpf,
-        rg: getV('eqp-rg'),
-        endereco: getV('eqp-endereco'),
-        obra_atual_id: obraId,   // agora obrigatório
-        valor_diaria: valorNum,
-        ativo: getV('eqp-ativo') === 'true',
-        data_contrato: getV('eqp-data_contrato') || null
-    };
-    
-    if (isNew) {
-        payload.id = gerarIdSeguro();
-        
-        // Calcula a Matrícula Sequencial automaticamente
-        let maxMat = 0;
-        if (STATE.equipe && STATE.equipe.length > 0) {
-            STATE.equipe.forEach(item => {
-                let m = parseInt(item.matricula);
-                if (!isNaN(m) && m > maxMat) maxMat = m;
-            });
+            const { error } = await sb.from('jsp_equipe').upsert(payload);
+            
+            if(error) { 
+                showLoading(false); 
+                return showToast("Erro: " + error.message, true); 
+            }
+            
+            closeOverlayForm('equipe-form-container');
+            
+            if(isNew) {
+                const nomeEl = document.getElementById('sucesso-nome');
+                const matEl = document.getElementById('sucesso-num-matricula');
+                const modalSucesso = document.getElementById('modal-sucesso-matricula');
+                
+                if(nomeEl) nomeEl.innerText = payload.nome;
+                if(matEl) matEl.innerText = payload.matricula;
+                if(modalSucesso) modalSucesso.classList.remove('hidden');
+                lucide.createIcons();
+            } else {
+                showToast("Funcionário atualizado com sucesso!"); 
+            }
+            
+            loadData();
         }
-        payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
-        payload.contrato_assinado = false;
-    } else {
-        payload.id = idAtual;
-    }
-
-    // ========== SALVA NO SUPABASE ==========
-    const { error } = await sb.from('jsp_equipe').upsert(payload);
-    
-    if (error) { 
-        showLoading(false); 
-        return showToast("Erro: " + error.message, true); 
-    }
-    
-    closeOverlayForm('equipe-form-container');
-    
-    if (isNew) {
-        const nomeEl = document.getElementById('sucesso-nome');
-        const matEl = document.getElementById('sucesso-num-matricula');
-        const modalSucesso = document.getElementById('modal-sucesso-matricula');
-        
-        if (nomeEl) nomeEl.innerText = payload.nome;
-        if (matEl) matEl.innerText = payload.matricula;
-        if (modalSucesso) modalSucesso.classList.remove('hidden');
-        lucide.createIcons();
-    } else {
-        showToast("✅ Funcionário atualizado com sucesso!"); 
-    }
-    
-    loadData();
-}
 
         function fazerLogout() { localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
     </script>
