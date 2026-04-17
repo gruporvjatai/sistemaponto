@@ -100,7 +100,9 @@
                 <div class="flex gap-2">
                     <div class="w-1/2">
                         <label class="text-[10px] font-bold text-slate-500 uppercase">CPF <span class="text-red-500">*</span></label>
-                        <input type="tel" id="eqp-cpf" required placeholder="Apenas números" inputmode="numeric" pattern="\d*" maxlength="11" oninput="this.value = this.value.replace(/\D/g, '').slice(0,11)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700">
+                        <input type="tel" id="eqp-cpf" required placeholder="000.000.000-00" inputmode="numeric" 
+                           oninput="mascaraCPF(this)" 
+                           class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700">
                     </div>
                     <div class="w-1/2">
                         <label class="text-[10px] font-bold text-slate-500 uppercase">RG</label>
@@ -328,7 +330,7 @@
                 const e = STATE.equipe.find(x => x.id == id); 
                 document.getElementById('eqp-id').value = e.id;
                 document.getElementById('eqp-nome').value = e.nome || '';
-                document.getElementById('eqp-cpf').value = e.cpf || '';
+                document.getElementById('eqp-cpf').value = formatarCPF(e.cpf || '');
                 document.getElementById('eqp-rg').value = e.rg || '';
                 document.getElementById('eqp-telefone').value = e.telefone || '';
                 document.getElementById('eqp-endereco').value = e.endereco || '';
@@ -358,112 +360,136 @@
         }
 
         async function saveEquipe(e) {
-            e.preventDefault(); 
-            
-            const getV = (id) => {
-                const el = document.getElementById(id);
-                return el ? el.value.trim() : '';
-            };
+    e.preventDefault(); 
+    
+    const getV = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    };
 
-            // Validação extra de campos obrigatórios (já garantidos pelo required do HTML)
-            const camposObrigatorios = ['eqp-nome', 'eqp-cpf', 'eqp-telefone', 'eqp-endereco', 'eqp-chave_pix', 'eqp-valor_diaria'];
-            for (let campo of camposObrigatorios) {
-                if (!getV(campo)) {
-                    showToast(`Preencha o campo ${campo.replace('eqp-', '').replace('_', ' ')}`, true);
-                    return;
-                }
-            }
-
-            const cpfBruto = getV('eqp-cpf');
-            if (!isCPFValido(cpfBruto)) {
-                showToast('CPF deve conter 11 dígitos numéricos', true);
-                return;
-            }
-
-            const cpfNormalizado = normalizarCPF(cpfBruto);
-            const idAtual = getV('eqp-id');
-            const isNew = !idAtual;
-
-            // Verifica duplicidade de CPF no banco (exceto para o próprio registro em edição)
-            showLoading(true);
-            try {
-                // Consulta direta ao Supabase para maior segurança
-                let query = sb.from('jsp_equipe').select('id').eq('cpf', cpfNormalizado);
-                if (!isNew) {
-                    query = query.neq('id', idAtual);
-                }
-                const { data: duplicado, error: errDuplicado } = await query.maybeSingle();
-                
-                if (errDuplicado) {
-                    showLoading(false);
-                    showToast('Erro ao verificar CPF: ' + errDuplicado.message, true);
-                    return;
-                }
-                
-                if (duplicado) {
-                    showLoading(false);
-                    showToast('Este CPF já está cadastrado no sistema.', true);
-                    return;
-                }
-            } catch (ex) {
-                showLoading(false);
-                showToast('Erro na verificação de duplicidade', true);
-                return;
-            }
-
-            const payload = {
-                nome: getV('eqp-nome'),
-                categoria: getV('eqp-categoria'),
-                telefone: getV('eqp-telefone'),
-                cpf: cpfNormalizado,  // Salva apenas números
-                rg: getV('eqp-rg'),
-                endereco: getV('eqp-endereco'),
-                chave_pix: getV('eqp-chave_pix'),
-                obra_atual_id: getV('eqp-obra_atual_id') || null,
-                valor_diaria: parseFloat(getV('eqp-valor_diaria')) || 0,
-                ativo: getV('eqp-ativo') === 'true'
-            };
-            
-            if(isNew) {
-                payload.id = gerarIdSeguro();
-                
-                let maxMat = 0;
-                if (STATE.equipe && STATE.equipe.length > 0) {
-                    STATE.equipe.forEach(item => {
-                        let m = parseInt(item.matricula);
-                        if (!isNaN(m) && m > maxMat) maxMat = m;
-                    });
-                }
-                payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
-                payload.contrato_assinado = false;
-            } else {
-                payload.id = idAtual;
-            }
-
-            const { error } = await sb.from('jsp_equipe').upsert(payload);
-            
-            if(error) { 
-                showLoading(false); 
-                return showToast("Erro: " + error.message, true); 
-            }
-            
-            closeOverlayForm('equipe-form-container');
-            
-            if(isNew) {
-                const nomeEl = document.getElementById('sucesso-nome');
-                const matEl = document.getElementById('sucesso-num-matricula');
-                const modalSucesso = document.getElementById('modal-sucesso-matricula');
-                
-                if(nomeEl) nomeEl.innerText = payload.nome;
-                if(matEl) matEl.innerText = payload.matricula;
-                if(modalSucesso) modalSucesso.classList.remove('hidden');
-                lucide.createIcons();
-            } else {
-                showToast("Funcionário atualizado com sucesso!"); 
-            }
-            
-            await loadData(); // Recarrega dados após salvar
+    // Validação extra de campos obrigatórios
+    const camposObrigatorios = ['eqp-nome', 'eqp-cpf', 'eqp-telefone', 'eqp-endereco', 'eqp-chave_pix', 'eqp-valor_diaria'];
+    for (let campo of camposObrigatorios) {
+        if (!getV(campo)) {
+            showToast(`Preencha o campo ${campo.replace('eqp-', '').replace('_', ' ')}`, true);
+            return;
         }
+    }
+
+    // Tratamento do CPF: remove formatação e valida
+    const cpfFormatado = getV('eqp-cpf');
+    const cpfNumerico = cpfFormatado.replace(/\D/g, '');
+    
+    if (cpfNumerico.length !== 11) {
+        showToast('CPF deve conter 11 dígitos numéricos', true);
+        return;
+    }
+
+    const idAtual = getV('eqp-id');
+    const isNew = !idAtual;
+
+    // Verifica duplicidade de CPF no banco (exceto para o próprio registro em edição)
+    showLoading(true);
+    try {
+        let query = sb.from('jsp_equipe').select('id').eq('cpf', cpfNumerico);
+        if (!isNew) {
+            query = query.neq('id', idAtual);
+        }
+        const { data: duplicado, error: errDuplicado } = await query.maybeSingle();
+        
+        if (errDuplicado) {
+            showLoading(false);
+            showToast('Erro ao verificar CPF: ' + errDuplicado.message, true);
+            return;
+        }
+        
+        if (duplicado) {
+            showLoading(false);
+            showToast('Este CPF já está cadastrado no sistema.', true);
+            return;
+        }
+    } catch (ex) {
+        showLoading(false);
+        showToast('Erro na verificação de duplicidade', true);
+        return;
+    }
+
+    const payload = {
+        nome: getV('eqp-nome'),
+        categoria: getV('eqp-categoria'),
+        telefone: getV('eqp-telefone'),
+        cpf: cpfNumerico,  // Salva apenas números
+        rg: getV('eqp-rg'),
+        endereco: getV('eqp-endereco'),
+        chave_pix: getV('eqp-chave_pix'),
+        obra_atual_id: getV('eqp-obra_atual_id') || null,
+        valor_diaria: parseFloat(getV('eqp-valor_diaria')) || 0,
+        ativo: getV('eqp-ativo') === 'true'
+    };
+    
+    if(isNew) {
+        payload.id = gerarIdSeguro();
+        
+        let maxMat = 0;
+        if (STATE.equipe && STATE.equipe.length > 0) {
+            STATE.equipe.forEach(item => {
+                let m = parseInt(item.matricula);
+                if (!isNaN(m) && m > maxMat) maxMat = m;
+            });
+        }
+        payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
+        payload.contrato_assinado = false;
+    } else {
+        payload.id = idAtual;
+    }
+
+    const { error } = await sb.from('jsp_equipe').upsert(payload);
+    
+    if(error) { 
+        showLoading(false); 
+        return showToast("Erro: " + error.message, true); 
+    }
+    
+    closeOverlayForm('equipe-form-container');
+    
+    if(isNew) {
+        const nomeEl = document.getElementById('sucesso-nome');
+        const matEl = document.getElementById('sucesso-num-matricula');
+        const modalSucesso = document.getElementById('modal-sucesso-matricula');
+        
+        if(nomeEl) nomeEl.innerText = payload.nome;
+        if(matEl) matEl.innerText = payload.matricula;
+        if(modalSucesso) modalSucesso.classList.remove('hidden');
+        lucide.createIcons();
+    } else {
+        showToast("Funcionário atualizado com sucesso!"); 
+    }
+    
+    await loadData();
+}
+
+      function mascaraCPF(input) {
+            let valor = input.value.replace(/\D/g, ''); // remove tudo que não for dígito
+            if (valor.length > 11) valor = valor.slice(0, 11);
+            
+            // Aplica a máscara 000.000.000-00
+            if (valor.length > 9) {
+                valor = valor.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+            } else if (valor.length > 6) {
+                valor = valor.replace(/^(\d{3})(\d{3})(\d{0,3})$/, '$1.$2.$3');
+            } else if (valor.length > 3) {
+                valor = valor.replace(/^(\d{3})(\d{0,3})$/, '$1.$2');
+            }
+            input.value = valor;
+        }
+
+
+        function formatarCPF(valor) {
+              if (!valor) return '';
+              const nums = valor.replace(/\D/g, '');
+              if (nums.length !== 11) return valor;
+              return nums.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+          }
 
         function fazerLogout() { localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
     </script>
