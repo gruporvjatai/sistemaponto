@@ -78,23 +78,45 @@
               </select>
           </div>
 
+          <!-- NOVO FILTRO DE TIPO -->
+          <div class="mb-4">
+              <select id="eqp-filter-tipo" onchange="renderEquipe()" class="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-blue-500 shadow-sm">
+                  <option value="todos">Todos os Tipos</option>
+                  <option value="diaria">Diária (Próprios)</option>
+                  <option value="metro">Metro (Terceirizados)</option>
+              </select>
+          </div>
+
           <div id="equipe-list" class="flex flex-col gap-2"></div>
       </div>
     </main>
 
     <div id="overlay-forms" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end justify-center no-print">
 
+      <!-- FORMULÁRIO UNIFICADO DE EQUIPE / TERCEIRIZADO -->
       <div id="equipe-form-container" class="hidden w-full bg-white rounded-t-3xl p-5 pb-10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
             <h3 class="font-black text-lg mb-4 flex justify-between items-center text-slate-800">
-                Cadastro de Funcionário 
+                Cadastro de Colaborador 
                 <button type="button" onclick="closeOverlayForm('equipe-form-container')" class="p-1.5 bg-slate-100 text-slate-500 rounded-full active:bg-slate-200"><i data-lucide="x" class="w-5 h-5"></i></button>
             </h3>
             <form onsubmit="saveEquipe(event)" class="space-y-3">
                 <input type="hidden" id="eqp-id">
+                <input type="hidden" id="eqp-tipo-origem" value="equipe"> <!-- NOVO -->
                 
                 <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Nome do Funcionário <span class="text-red-500">*</span></label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Nome Completo <span class="text-red-500">*</span></label>
                     <input type="text" id="eqp-nome" required placeholder="Ex: João da Silva" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 font-bold text-slate-800">
+                </div>
+                
+                <!-- NOVO: Select de categoria com opção Terceirizado -->
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Categoria / Função <span class="text-red-500">*</span></label>
+                    <select id="eqp-categoria" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500" onchange="onCategoriaChange()">
+                        <option value="" disabled selected>-- Selecione --</option>
+                        <option value="Pedreiro">Pedreiro (Diária)</option>
+                        <option value="Servente">Servente (Diária)</option>
+                        <option value="Terceirizado">Terceirizado (Metro)</option>
+                    </select>
                 </div>
                 
                 <div class="flex gap-2">
@@ -127,23 +149,20 @@
                 
                 <div class="flex gap-2">
                     <div class="w-1/2">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase">Categoria/Função <span class="text-red-500">*</span></label>
-                        <select id="eqp-categoria" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500">
-                            <option value="Servente">Servente</option>
-                            <option value="Pedreiro">Pedreiro</option>
-                        </select>
-                    </div>
-                    <div class="w-1/2">
                         <label class="text-[10px] font-bold text-slate-500 uppercase">Status <span class="text-red-500">*</span></label>
                         <select id="eqp-ativo" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500">
                             <option value="true">Ativo</option>
                             <option value="false">Inativo</option>
                         </select>
                     </div>
+                    <div class="w-1/2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">Data de Contrato</label>
+                        <input type="date" id="eqp-data_contrato" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 text-slate-700">
+                    </div>
                 </div>
 
                 <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Valor Diária (R$) <span class="text-red-500">*</span></label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase" id="label-valor-base">Valor Diária (R$) <span class="text-red-500">*</span></label>
                     <input type="number" step="0.01" id="eqp-valor_diaria" required placeholder="0.00" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 font-black text-slate-700">
                 </div>
 
@@ -153,7 +172,7 @@
                 </div>
                 
                 <button type="submit" class="w-full p-4 bg-blue-700 hover:bg-blue-800 transition-colors text-white rounded-xl font-black mt-4 shadow-lg active:scale-95 flex justify-center items-center gap-2">
-                    <i data-lucide="check-circle" class="w-5 h-5"></i> Salvar Funcionário
+                    <i data-lucide="check-circle" class="w-5 h-5"></i> Salvar
                 </button>
             </form>
       </div>
@@ -189,7 +208,8 @@
         const supabaseKey = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
         const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-        let STATE = { obras: [], equipe: [] };
+        // ADICIONADO: STATE agora inclui terceirizados
+        let STATE = { obras: [], equipe: [], terceirizados: [] };
 
         window.onload = function() { 
             if (dadosUsuario) { showLoading(true); loadData(); }
@@ -207,12 +227,6 @@
         // Normaliza CPF (remove tudo que não for dígito)
         function normalizarCPF(cpf) {
             return cpf ? cpf.replace(/\D/g, '') : '';
-        }
-
-        // Validação básica: 11 dígitos
-        function isCPFValido(cpf) {
-            const limpo = normalizarCPF(cpf);
-            return limpo.length === 11;
         }
 
         function openOverlayForm(id) {
@@ -241,12 +255,14 @@
 
         async function loadData() {
             try {
-                const [resObras, resEquipe] = await Promise.all([
+                const [resObras, resEquipe, resTerceirizados] = await Promise.all([
                     fetchAllRecords('jsp_obras'),
-                    fetchAllRecords('jsp_equipe')
+                    fetchAllRecords('jsp_equipe'),
+                    fetchAllRecords('jsp_terceirizados').catch(() => ({ data: [] }))
                 ]);
                 STATE.obras = resObras.data || [];
                 STATE.equipe = resEquipe.data || [];
+                STATE.terceirizados = resTerceirizados.data || [];
 
                 updateSelects();
                 renderEquipe();
@@ -258,7 +274,6 @@
 
         function updateSelects() {
             const htmlObras = '<option value="">Todas Obras</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
-            //const htmlObrasStrict = '<option value="">-- Selecione Obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             const htmlObrasStrict = '<option value="" disabled selected>-- Selecione uma obra --</option>' + STATE.obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
             
             const eqpObra = document.getElementById('eqp-obra_atual_id'); 
@@ -268,84 +283,181 @@
             if(eqpFilterObra) { const cVal = eqpFilterObra.value; eqpFilterObra.innerHTML = htmlObras; if(cVal) eqpFilterObra.value = cVal; }
         }
 
-        // ====== LÓGICA DE EQUIPE ======
+        // ====== NOVA FUNÇÃO: Unifica equipe própria e terceirizados para exibição ======
+        function getColaboradoresUnificados() {
+            const equipe = STATE.equipe.map(e => ({
+                ...e,
+                tipo: 'diaria',
+                valor_base: parseFloat(e.valor_diaria || 0),
+                table_origin: 'equipe'
+            }));
+
+            const terceirizados = STATE.terceirizados.map(t => ({
+                ...t,
+                nome: t.nome,
+                categoria: 'Terceirizado (Metro)',
+                telefone: t.telefone,
+                cpf: t.cpf_cnpj,
+                rg: t.rg,
+                endereco: t.endereco,
+                chave_pix: t.chave_pix,
+                obra_atual_id: t.obra_atual_id,
+                ativo: t.ativo,
+                tipo: 'metro',
+                valor_base: parseFloat(t.valor_metro || 0),
+                table_origin: 'terceirizados'
+            }));
+
+            return [...equipe, ...terceirizados];
+        }
+
+        // ====== RENDER EQUIPE UNIFICADA ======
         function renderEquipe() {
             const term = document.getElementById('eqp-search').value.toLowerCase();
             const filterObra = document.getElementById('eqp-filter-obra').value;
             const filterStatus = document.getElementById('eqp-filter-status').value;
+            const filterTipo = document.getElementById('eqp-filter-tipo').value;
             
-            let fil = STATE.equipe.filter(e => 
-                (e.nome || '').toLowerCase().includes(term) || 
-                (e.categoria || '').toLowerCase().includes(term)
+            const colaboradores = getColaboradoresUnificados();
+            
+            let fil = colaboradores.filter(c => 
+                (c.nome || '').toLowerCase().includes(term) || 
+                (c.categoria || '').toLowerCase().includes(term)
             );
 
             if(filterObra) {
-                fil = fil.filter(e => String(e.obra_atual_id) === String(filterObra));
+                fil = fil.filter(c => String(c.obra_atual_id) === String(filterObra));
             }
             if(filterStatus) {
                 const isAtivoStatus = filterStatus === 'true';
-                fil = fil.filter(e => (e.ativo === true || e.ativo === 'true') === isAtivoStatus);
+                fil = fil.filter(c => (c.ativo === true || c.ativo === 'true') === isAtivoStatus);
+            }
+            if(filterTipo !== 'todos') {
+                fil = fil.filter(c => c.tipo === filterTipo);
             }
 
             fil.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
             
-            document.getElementById('equipe-list').innerHTML = fil.map(e => {
-                const obra = STATE.obras.find(x => x.id == e.obra_atual_id);
+            document.getElementById('equipe-list').innerHTML = fil.map(c => {
+                const obra = STATE.obras.find(x => x.id == c.obra_atual_id);
                 const nomeObra = obra ? obra.nome : 'Sem obra alocada';
-                const isAtivo = e.ativo === true || e.ativo === 'true'; 
+                const isAtivo = c.ativo === true || c.ativo === 'true';
+                
+                const tipoBadge = c.tipo === 'diaria' 
+                    ? '<span class="bg-blue-100 text-blue-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">DIÁRIA</span>'
+                    : '<span class="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">METRO</span>';
+                
+                const valorExibicao = c.tipo === 'diaria' 
+                    ? `Diária: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    : `Metro: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/m`;
 
                 let zapBtn = '';
-                if(e.telefone) {
-                    const numZap = e.telefone.replace(/\D/g, ''); 
+                if(c.telefone) {
+                    const numZap = c.telefone.replace(/\D/g, ''); 
                     if(numZap.length >= 10) { 
                         zapBtn = `<a href="https://wa.me/55${numZap}" target="_blank" class="p-2 bg-green-100 text-green-600 hover:bg-green-200 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="message-circle" class="w-4 h-4"></i></a>`;
                     }
                 }
 
+                let botoesAcao = '';
+                if (c.tipo === 'diaria') {
+                    botoesAcao = `<button onclick="openEquipeForm('${c.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
+                } else {
+                    botoesAcao = `<button onclick="openEquipeForm('${c.id}', 'terceirizado')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
+                }
+
                 return `
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
                     <div class="absolute top-3 right-3 flex gap-1.5 items-center">
-                        <span class="bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-2 py-1 rounded-md">Mat: ${e.matricula || '-'}</span>
+                        ${c.tipo === 'diaria' ? `<span class="bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-2 py-1 rounded-md">Mat: ${c.matricula || '-'}</span>` : ''}
                         <span class="${isAtivo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} text-[9px] font-black px-2 py-1 rounded-md tracking-wider">${isAtivo ? 'ATIVO' : 'INATIVO'}</span>
                     </div>
                     
                     <div class="flex justify-between items-start mb-2 pr-28">
                         <div>
-                            <h4 class="font-black text-slate-800 text-sm leading-tight">${e.nome || '-'}</h4>
-                            <p class="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">${e.categoria || '-'} ${e.telefone ? ` | ${e.telefone}` : ''}</p>
+                            <h4 class="font-black text-slate-800 text-sm leading-tight flex items-center">
+                                ${c.nome || '-'} ${tipoBadge}
+                            </h4>
+                            <p class="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">${c.categoria || '-'} ${c.telefone ? ` | ${c.telefone}` : ''}</p>
                             <p class="text-xs text-blue-700 font-bold mt-1.5 flex items-center gap-1 bg-blue-50 w-max px-2 py-1 rounded-md"><i data-lucide="building" class="w-3 h-3"></i> ${nomeObra}</p>
+                            <p class="text-[10px] text-slate-600 font-bold mt-1">${valorExibicao}</p>
                         </div>
                     </div>
                     
                     <div class="flex justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
                         ${zapBtn}
-                        <button onclick="openEquipeForm('${e.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        ${botoesAcao}
                     </div>
                 </div>`;
             }).join('');
             lucide.createIcons();
         }
 
-        function openEquipeForm(id) {
-            if(id) {
-                const e = STATE.equipe.find(x => x.id == id); 
-                document.getElementById('eqp-id').value = e.id;
-                document.getElementById('eqp-nome').value = e.nome || '';
-                document.getElementById('eqp-cpf').value = formatarCPF(e.cpf || '');
-                document.getElementById('eqp-rg').value = e.rg || '';
-                document.getElementById('eqp-telefone').value = e.telefone || '';
-                document.getElementById('eqp-endereco').value = e.endereco || '';
-                document.getElementById('eqp-chave_pix').value = e.chave_pix || '';
-                document.getElementById('eqp-valor_diaria').value = e.valor_diaria || '';
-                document.getElementById('eqp-categoria').value = e.categoria || 'Servente';
-                document.getElementById('eqp-ativo').value = (e.ativo === true || e.ativo === 'true') ? 'true' : 'false';
-                document.getElementById('eqp-obra_atual_id').value = e.obra_atual_id || '';
-            } else { 
-                document.getElementById('equipe-form-container').querySelector('form').reset(); 
-                document.getElementById('eqp-id').value = ''; 
-                document.getElementById('eqp-chave_pix').value = '';
-                document.getElementById('eqp-categoria').value = 'Servente';
+        // ====== NOVA FUNÇÃO: Altera label do campo valor conforme categoria ======
+        function onCategoriaChange() {
+            const cat = document.getElementById('eqp-categoria').value;
+            const label = document.getElementById('label-valor-base');
+            const tipoOrigem = document.getElementById('eqp-tipo-origem');
+            
+            if (cat === 'Terceirizado') {
+                label.innerText = 'Valor do Metro (R$) *';
+                tipoOrigem.value = 'terceirizado';
+            } else {
+                label.innerText = 'Valor Diária (R$) *';
+                tipoOrigem.value = 'equipe';
+            }
+        }
+
+        // ====== ABRIR FORMULÁRIO UNIFICADO ======
+        function openEquipeForm(id, tipoOrigem = 'equipe') {
+            const catSelect = document.getElementById('eqp-categoria');
+            const tipoHidden = document.getElementById('eqp-tipo-origem');
+            
+            if (id) {
+                if (tipoOrigem === 'terceirizado') {
+                    const t = STATE.terceirizados.find(x => x.id == id);
+                    if (t) {
+                        document.getElementById('eqp-id').value = t.id;
+                        document.getElementById('eqp-nome').value = t.nome || '';
+                        catSelect.value = 'Terceirizado';
+                        document.getElementById('eqp-telefone').value = t.telefone || '';
+                        document.getElementById('eqp-cpf').value = formatarCPF(t.cpf_cnpj || '');
+                        document.getElementById('eqp-rg').value = t.rg || '';
+                        document.getElementById('eqp-endereco').value = t.endereco || '';
+                        document.getElementById('eqp-chave_pix').value = t.chave_pix || '';
+                        document.getElementById('eqp-obra_atual_id').value = t.obra_atual_id || '';
+                        document.getElementById('eqp-data_contrato').value = '';
+                        document.getElementById('eqp-valor_diaria').value = t.valor_metro || '';
+                        document.getElementById('eqp-ativo').value = (t.ativo === true || t.ativo === 'true') ? 'true' : 'false';
+                        tipoHidden.value = 'terceirizado';
+                        onCategoriaChange();
+                    }
+                } else {
+                    const e = STATE.equipe.find(x => x.id == id);
+                    if (e) {
+                        document.getElementById('eqp-id').value = e.id;
+                        document.getElementById('eqp-nome').value = e.nome || '';
+                        catSelect.value = e.categoria || 'Servente';
+                        document.getElementById('eqp-cpf').value = formatarCPF(e.cpf || '');
+                        document.getElementById('eqp-rg').value = e.rg || '';
+                        document.getElementById('eqp-telefone').value = e.telefone || '';
+                        document.getElementById('eqp-endereco').value = e.endereco || '';
+                        document.getElementById('eqp-chave_pix').value = e.chave_pix || '';
+                        document.getElementById('eqp-valor_diaria').value = e.valor_diaria || '';
+                        document.getElementById('eqp-obra_atual_id').value = e.obra_atual_id || '';
+                        document.getElementById('eqp-data_contrato').value = e.data_contrato || '';
+                        document.getElementById('eqp-ativo').value = (e.ativo === true || e.ativo === 'true') ? 'true' : 'false';
+                        tipoHidden.value = 'equipe';
+                        onCategoriaChange();
+                    }
+                }
+            } else {
+                document.getElementById('equipe-form-container').querySelector('form').reset();
+                document.getElementById('eqp-id').value = '';
+                catSelect.value = 'Servente';
                 document.getElementById('eqp-ativo').value = 'true';
+                tipoHidden.value = 'equipe';
+                onCategoriaChange();
             }
             openOverlayForm('equipe-form-container');
         }
@@ -360,120 +472,156 @@
             });
         }
 
+        // ====== SALVAR UNIFICADO ======
         async function saveEquipe(e) {
-    e.preventDefault(); 
-    
-    const getV = (id) => {
-        const el = document.getElementById(id);
-        return el ? el.value.trim() : '';
-    };
-
-    // Validação extra de campos obrigatórios
-    const camposObrigatorios = ['eqp-nome', 'eqp-cpf', 'eqp-telefone', 'eqp-endereco', 'eqp-chave_pix', 'eqp-valor_diaria', 'eqp-obra_atual_id'];
-    for (let campo of camposObrigatorios) {
-        if (!getV(campo)) {
-            showToast(`Preencha o campo ${campo.replace('eqp-', '').replace('_', ' ')}`, true);
-            return;
-        }
-    }
-
-    // Tratamento do CPF: remove formatação e valida
-    const cpfFormatado = getV('eqp-cpf');
-    const cpfNumerico = cpfFormatado.replace(/\D/g, '');
-    
-    if (cpfNumerico.length !== 11) {
-        showToast('CPF deve conter 11 dígitos numéricos', true);
-        return;
-    }
-
-    const idAtual = getV('eqp-id');
-    const isNew = !idAtual;
-
-    // Verifica duplicidade de CPF no banco (exceto para o próprio registro em edição)
-    showLoading(true);
-    try {
-        let query = sb.from('jsp_equipe').select('id').eq('cpf', cpfNumerico);
-        if (!isNew) {
-            query = query.neq('id', idAtual);
-        }
-        const { data: duplicado, error: errDuplicado } = await query.maybeSingle();
-        
-        if (errDuplicado) {
-            showLoading(false);
-            showToast('Erro ao verificar CPF: ' + errDuplicado.message, true);
-            return;
-        }
-        
-        if (duplicado) {
-            showLoading(false);
-            showToast('Este CPF já está cadastrado no sistema.', true);
-            return;
-        }
-    } catch (ex) {
-        showLoading(false);
-        showToast('Erro na verificação de duplicidade', true);
-        return;
-    }
-
-    const payload = {
-        nome: getV('eqp-nome'),
-        categoria: getV('eqp-categoria'),
-        telefone: getV('eqp-telefone'),
-        cpf: cpfNumerico,  // Salva apenas números
-        rg: getV('eqp-rg'),
-        endereco: getV('eqp-endereco'),
-        chave_pix: getV('eqp-chave_pix'),
-        obra_atual_id: getV('eqp-obra_atual_id') || null,
-        valor_diaria: parseFloat(getV('eqp-valor_diaria')) || 0,
-        ativo: getV('eqp-ativo') === 'true'
-    };
-    
-    if(isNew) {
-        payload.id = gerarIdSeguro();
-        
-        let maxMat = 0;
-        if (STATE.equipe && STATE.equipe.length > 0) {
-            STATE.equipe.forEach(item => {
-                let m = parseInt(item.matricula);
-                if (!isNaN(m) && m > maxMat) maxMat = m;
-            });
-        }
-        payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
-        payload.contrato_assinado = false;
-    } else {
-        payload.id = idAtual;
-    }
-
-    const { error } = await sb.from('jsp_equipe').upsert(payload);
-    
-    if(error) { 
-        showLoading(false); 
-        return showToast("Erro: " + error.message, true); 
-    }
-    
-    closeOverlayForm('equipe-form-container');
-    
-    if(isNew) {
-        const nomeEl = document.getElementById('sucesso-nome');
-        const matEl = document.getElementById('sucesso-num-matricula');
-        const modalSucesso = document.getElementById('modal-sucesso-matricula');
-        
-        if(nomeEl) nomeEl.innerText = payload.nome;
-        if(matEl) matEl.innerText = payload.matricula;
-        if(modalSucesso) modalSucesso.classList.remove('hidden');
-        lucide.createIcons();
-    } else {
-        showToast("Funcionário atualizado com sucesso!"); 
-    }
-    
-    await loadData();
-}
-
-      function mascaraCPF(input) {
-            let valor = input.value.replace(/\D/g, ''); // remove tudo que não for dígito
-            if (valor.length > 11) valor = valor.slice(0, 11);
+            e.preventDefault(); 
+            showLoading(true);
             
-            // Aplica a máscara 000.000.000-00
+            const getV = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value.trim() : '';
+            };
+
+            const idAtual = getV('eqp-id');
+            const isNew = !idAtual;
+            const tipoOrigem = document.getElementById('eqp-tipo-origem').value;
+            
+            const nome = getV('eqp-nome');
+            const categoria = getV('eqp-categoria');
+            const telefone = getV('eqp-telefone');
+            const cpf = getV('eqp-cpf');
+            const rg = getV('eqp-rg');
+            const endereco = getV('eqp-endereco');
+            const chave_pix = getV('eqp-chave_pix');
+            const obra_id = getV('eqp-obra_atual_id') || null;
+            const valor_base = parseFloat(getV('eqp-valor_diaria')) || 0;
+            const data_contrato = getV('eqp-data_contrato') || null;
+            const ativo = getV('eqp-ativo') === 'true';
+
+            // Validações básicas
+            if (!nome) { showLoading(false); showToast("Nome obrigatório.", true); return; }
+            if (!cpf) { showLoading(false); showToast("CPF obrigatório.", true); return; }
+            if (!telefone) { showLoading(false); showToast("Telefone obrigatório.", true); return; }
+            if (!obra_id) { showLoading(false); showToast("Selecione a obra.", true); return; }
+            if (valor_base <= 0) { showLoading(false); showToast("Valor inválido.", true); return; }
+
+            const cpfNumerico = cpf.replace(/\D/g, '');
+            if (cpfNumerico.length !== 11) {
+                showLoading(false);
+                showToast('CPF deve conter 11 dígitos numéricos', true);
+                return;
+            }
+
+            // Verifica duplicidade de CPF (apenas para equipe própria)
+            if (tipoOrigem === 'equipe') {
+                try {
+                    let query = sb.from('jsp_equipe').select('id').eq('cpf', cpfNumerico);
+                    if (!isNew) query = query.neq('id', idAtual);
+                    const { data: duplicado, error: errDuplicado } = await query.maybeSingle();
+                    if (errDuplicado) {
+                        showLoading(false);
+                        showToast('Erro ao verificar CPF: ' + errDuplicado.message, true);
+                        return;
+                    }
+                    if (duplicado) {
+                        showLoading(false);
+                        showToast('Este CPF já está cadastrado no sistema.', true);
+                        return;
+                    }
+                } catch (ex) {
+                    showLoading(false);
+                    showToast('Erro na verificação de duplicidade', true);
+                    return;
+                }
+            }
+
+            if (tipoOrigem === 'terceirizado') {
+                const payload = {
+                    nome,
+                    cpf_cnpj: cpf,
+                    rg,
+                    telefone,
+                    chave_pix,
+                    endereco,
+                    obra_atual_id: obra_id,
+                    valor_metro: valor_base,
+                    ativo
+                };
+                
+                if (!isNew) {
+                    payload.id = idAtual;
+                } else {
+                    payload.id = gerarIdSeguro();
+                }
+                
+                const { error } = await sb.from('jsp_terceirizados').upsert(payload);
+                if (error) {
+                    showLoading(false);
+                    return showToast("Erro ao salvar terceirizado: " + error.message, true);
+                }
+                
+                closeOverlayForm('equipe-form-container');
+                showToast("Terceirizado salvo com sucesso!");
+                await loadData();
+            } else {
+                const payload = {
+                    nome,
+                    categoria,
+                    telefone,
+                    cpf: cpfNumerico,
+                    rg,
+                    endereco,
+                    chave_pix,
+                    obra_atual_id: obra_id,
+                    valor_diaria: valor_base,
+                    data_contrato,
+                    ativo
+                };
+                
+                if (!isNew) {
+                    payload.id = idAtual;
+                } else {
+                    payload.id = gerarIdSeguro();
+                    
+                    let maxMat = 0;
+                    if (STATE.equipe && STATE.equipe.length > 0) {
+                        STATE.equipe.forEach(item => {
+                            let m = parseInt(item.matricula);
+                            if (!isNaN(m) && m > maxMat) maxMat = m;
+                        });
+                    }
+                    payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
+                    payload.contrato_assinado = false;
+                }
+                
+                const { error } = await sb.from('jsp_equipe').upsert(payload);
+                if (error) {
+                    showLoading(false);
+                    return showToast("Erro ao salvar membro da equipe: " + error.message, true);
+                }
+                
+                closeOverlayForm('equipe-form-container');
+                
+                if (isNew) {
+                    const nomeEl = document.getElementById('sucesso-nome');
+                    const matEl = document.getElementById('sucesso-num-matricula');
+                    const modalSucesso = document.getElementById('modal-sucesso-matricula');
+                    
+                    if(nomeEl) nomeEl.innerText = payload.nome;
+                    if(matEl) matEl.innerText = payload.matricula;
+                    if(modalSucesso) modalSucesso.classList.remove('hidden');
+                    lucide.createIcons();
+                } else {
+                    showToast("Funcionário atualizado com sucesso!");
+                }
+                
+                await loadData();
+            }
+        }
+
+        function mascaraCPF(input) {
+            let valor = input.value.replace(/\D/g, '');
+            if (valor.length > 11) valor = valor.slice(0, 11);
             if (valor.length > 9) {
                 valor = valor.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
             } else if (valor.length > 6) {
@@ -484,13 +632,12 @@
             input.value = valor;
         }
 
-
         function formatarCPF(valor) {
-              if (!valor) return '';
-              const nums = valor.replace(/\D/g, '');
-              if (nums.length !== 11) return valor;
-              return nums.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-          }
+            if (!valor) return '';
+            const nums = valor.replace(/\D/g, '');
+            if (nums.length !== 11) return valor;
+            return nums.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        }
 
         function fazerLogout() { localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
     </script>
