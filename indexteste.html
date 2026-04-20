@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RV Negócios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="shortcut icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="application-name" content="RV Negócios">
+    <meta name="apple-mobile-web-app-title" content="RV Negócios">
+    <meta name="theme-color" content="#0f172a"> 
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+        .loader { border: 3px solid #e2e8f0; border-top: 3px solid #059669; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-200 transition-all">
+        <div class="bg-slate-900 p-8 flex flex-col items-center">
+            <div class="w-24 h-24 rounded-full border-4 border-blue-500 mb-4 shadow-lg bg-white overflow-hidden p-2">
+               <img src="logo.png" class="w-full h-full object-contain" onerror="this.src='https://i.postimg.cc/PqdgXGF0/logo-rv-negociospng.png'" />
+            </div>
+            <h1 class="text-2xl font-bold tracking-wider text-white">RV NEGÓCIOS<br></h1>
+            <p class="text-blue-500 text-sm font-medium mt-1">Acesso ao Sistema de Obras</p>
+        </div>
+
+        <div id="area-login" class="p-8">
+            <form id="loginForm" onsubmit="fazerLogin(event)" class="space-y-5">
+                
+                <div id="msg-erro" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-bold border border-red-200">
+                    Usuário ou senha incorretos.
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Usuário</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-3 top-3 text-slate-400 w-5 h-5"></i>
+                        <input type="text" id="login_user" required placeholder="Seu nome de usuário (Ex: admin)" class="w-full p-3 pl-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-slate-50">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Senha (Somente números)</label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3 top-3 text-slate-400 w-5 h-5"></i>
+                        <input type="password" 
+                               id="senha" 
+                               inputmode="numeric" 
+                               pattern="[0-9]*" 
+                               placeholder="••••••" 
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
+                               class="w-full p-3 pl-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-slate-50">
+                    </div>
+                </div>
+
+                <button type="submit" id="btn-login" class="w-full py-3 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-4">
+                    <span>Entrar</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </button>
+                
+                <div id="loading" class="hidden justify-center items-center gap-2 py-3 mt-4">
+                    <div class="loader"></div>
+                    <span class="text-slate-500 font-bold text-sm">Validando...</span>
+                </div>
+                
+            </form>
+        </div>
+
+        <div id="area-menu" class="hidden p-8 flex-col gap-4">
+            <div class="text-center mb-4">
+                <h2 id="saudacao-user" class="text-lg font-black text-slate-800 uppercase">Olá!</h2>
+                <p class="text-sm font-bold text-slate-500">Selecione o módulo que deseja acessar:</p>
+            </div>
+
+            <!-- Botões dinâmicos conforme nível de acesso -->
+            <div id="menu-buttons" class="flex flex-col gap-3">
+                <!-- Serão preenchidos via JavaScript -->
+            </div>
+
+            <button onclick="fazerLogout()" class="mt-4 w-full py-3 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                <i data-lucide="log-out" class="w-4 h-4"></i> Sair do Sistema
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const supabaseUrl = 'https://lyieiqhkspbowsrlngvn.supabase.co'; 
+        const supabaseKey = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
+        const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Verifica se já está logado ao carregar a página
+        window.onload = () => {
+            const userStorage = localStorage.getItem('rv_user');
+            if(userStorage) {
+                const user = JSON.parse(userStorage);
+                mostrarMenu(user.nome, user.nivel);
+            }
+        };
+
+        async function fazerLogin(e) {
+            e.preventDefault();
+            
+            const login_user = document.getElementById('login_user').value.trim().toLowerCase();
+            const senha = document.getElementById('senha').value;
+            const btn = document.getElementById('btn-login');
+            const load = document.getElementById('loading');
+            const msgErro = document.getElementById('msg-erro');
+
+            btn.classList.add('hidden');
+            load.classList.remove('hidden');
+            load.classList.add('flex');
+            msgErro.classList.add('hidden');
+
+            try {
+                const { data, error } = await sb
+                    .from('jsp_usuarios')
+                    .select('*')
+                    .eq('login', login_user)
+                    .eq('senha', senha)
+                    .eq('ativo', true)
+                    .single();
+
+                if (error || !data) {
+                    throw new Error("Credenciais inválidas");
+                }
+
+                // Salva na sessão
+                localStorage.setItem('rv_user', JSON.stringify({
+                    id: data.id,
+                    nome: data.nome,
+                    nivel: data.nivel_acesso  // "admin", "comprador", "registros"
+                }));
+
+                mostrarMenu(data.nome, data.nivel_acesso);
+
+            } catch (err) {
+                btn.classList.remove('hidden');
+                load.classList.add('hidden');
+                load.classList.remove('flex');
+                msgErro.classList.remove('hidden');
+            }
+        }
+
+        function mostrarMenu(nomeUsuario, nivel) {
+            document.getElementById('area-login').classList.add('hidden');
+            
+            const primeiroNome = nomeUsuario.split(' ')[0];
+            document.getElementById('saudacao-user').innerText = `Olá, ${primeiroNome}!`;
+
+            const menuContainer = document.getElementById('menu-buttons');
+            menuContainer.innerHTML = '';
+
+            if (nivel === 'registros') {
+                // Apenas botão de Presenças Diárias
+                menuContainer.innerHTML = `
+                    <button onclick="window.location.href='pontoteste.html'" class="w-full p-4 bg-blue-50 border-2 border-blue-200 hover:bg-blue-600 hover:border-blue-600 hover:text-white text-blue-800 rounded-xl font-bold transition-all flex items-center gap-4 group shadow-sm">
+                        <div class="bg-white p-2 rounded-lg group-hover:bg-blue-500 transition-colors">
+                            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block text-base">Presenças Diárias</span>
+                            <span class="block text-[11px] opacity-80 uppercase tracking-wider font-semibold">Registro de Ponto</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-5 h-5 ml-auto opacity-50"></i>
+                    </button>
+                `;
+            } else {
+                // Menu completo (admin / comprador)
+                menuContainer.innerHTML = `
+                    <button onclick="window.location.href='encarregadoteste.html'" class="w-full p-4 bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-600 hover:border-indigo-600 hover:text-white text-indigo-800 rounded-xl font-bold transition-all flex items-center gap-4 group shadow-sm">
+                        <div class="bg-white p-2 rounded-lg group-hover:bg-indigo-500 transition-colors">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block text-base">Controle de Ponto</span>
+                            <span class="block text-[11px] opacity-80 uppercase tracking-wider font-semibold">Painel do Encarregado</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-5 h-5 ml-auto opacity-50"></i>
+                    </button>
+
+                    <button onclick="window.location.href='cadastro.html'" class="w-full p-4 bg-emerald-50 border-2 border-emerald-200 hover:bg-emerald-600 hover:border-emerald-600 hover:text-white text-emerald-800 rounded-xl font-bold transition-all flex items-center gap-4 group shadow-sm">
+                        <div class="bg-white p-2 rounded-lg group-hover:bg-emerald-500 transition-colors">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div class="text-left">
+                            <span class="block text-base">Funcionários</span>
+                            <span class="block text-[11px] opacity-80 uppercase tracking-wider font-semibold">Cadastro de Equipe</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-5 h-5 ml-auto opacity-50"></i>
+                    </button>
+                `;
+            }
+
+            document.getElementById('area-menu').classList.remove('hidden');
+            document.getElementById('area-menu').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function fazerLogout() {
+            localStorage.removeItem('rv_user');
+            // Não remover obra_atual_id, pois o dispositivo pode ser compartilhado
+            document.getElementById('login_user').value = '';
+            document.getElementById('senha').value = '';
+            
+            document.getElementById('area-menu').classList.add('hidden');
+            document.getElementById('area-menu').classList.remove('flex');
+            
+            document.getElementById('area-login').classList.remove('hidden');
+            document.getElementById('btn-login').classList.remove('hidden');
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('loading').classList.remove('flex');
+        }
+    </script>
+</body>
+</html>
