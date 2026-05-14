@@ -478,8 +478,159 @@
             });
         }
 
+
+
+
+
+      async function saveEquipe(e) {
+    e.preventDefault(); 
+    showLoading(true);
+    
+    const getV = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    };
+
+    const idAtual = getV('eqp-id');
+    const isNew = !idAtual;
+    const tipoOrigem = document.getElementById('eqp-tipo-origem').value;
+    
+    const nome = getV('eqp-nome');
+    const categoria = getV('eqp-categoria');
+    const telefone = getV('eqp-telefone');
+    const cpf = getV('eqp-cpf');
+    const rg = getV('eqp-rg');
+    const endereco = getV('eqp-endereco');
+    const chave_pix = getV('eqp-chave_pix');
+    const obra_id = getV('eqp-obra_atual_id') || null;
+    const valor_base = parseFloat(getV('eqp-valor_diaria')) || 0;
+    const data_contrato = getV('eqp-data_contrato') || null;
+    const ativo = getV('eqp-ativo') === 'true';
+
+    // Validações básicas
+    if (!nome) { showLoading(false); showToast("Nome obrigatório.", true); return; }
+    if (!cpf) { showLoading(false); showToast("CPF obrigatório.", true); return; }
+    if (!telefone) { showLoading(false); showToast("Telefone obrigatório.", true); return; }
+    if (!obra_id) { showLoading(false); showToast("Selecione a obra.", true); return; }
+    if (valor_base <= 0) { showLoading(false); showToast("Valor inválido.", true); return; }
+
+    const cpfNumerico = cpf.replace(/\D/g, '');
+    if (cpfNumerico.length !== 11) {
+        showLoading(false);
+        showToast('CPF deve conter 11 dígitos numéricos', true);
+        return;
+    }
+
+    // ========== VERIFICAÇÃO DE CPF DUPLICADO (USANDO STATE) ==========
+    if (tipoOrigem === 'equipe') {
+        // Procura na lista de equipe carregada se existe outro registro com o mesmo CPF (ignorando formatação)
+        const cpfDuplicado = STATE.equipe.find(item => {
+            // Normaliza o CPF armazenado (remove tudo que não for dígito)
+            const cpfExistente = (item.cpf || '').replace(/\D/g, '');
+            // Compara com o CPF numérico do formulário; se for edição, ignora o próprio registro
+            return cpfExistente === cpfNumerico && item.id !== idAtual;
+        });
+
+        if (cpfDuplicado) {
+            const obraNome = STATE.obras.find(o => o.id == cpfDuplicado.obra_atual_id)?.nome || 'desconhecida';
+            showLoading(false);
+            showToast(`CPF já cadastrado para ${cpfDuplicado.nome} (obra: ${obraNome})`, true);
+            return;
+        }
+    }
+    // ================================================================
+
+    if (tipoOrigem === 'terceirizado') {
+        const payload = {
+            nome,
+            cpf_cnpj: cpf,
+            rg,
+            telefone,
+            chave_pix,
+            endereco,
+            obra_atual_id: obra_id,
+            valor_metro: valor_base,
+            data_contrato: data_contrato,
+            ativo
+        };
+        
+        if (!isNew) {
+            payload.id = idAtual;
+        } else {
+            payload.id = gerarIdSeguro();
+        }
+        
+        const { error } = await sb.from('jsp_terceirizados').upsert(payload);
+        if (error) {
+            showLoading(false);
+            return showToast("Erro ao salvar terceirizado: " + error.message, true);
+        }
+        
+        closeOverlayForm('equipe-form-container');
+        showToast("Terceirizado salvo com sucesso!");
+        await loadData();
+    } else {
+        const payload = {
+            nome,
+            categoria,
+            telefone,
+            cpf: cpfNumerico,
+            rg,
+            endereco,
+            chave_pix,
+            obra_atual_id: obra_id,
+            valor_diaria: valor_base,
+            data_contrato,
+            ativo
+        };
+        
+        if (!isNew) {
+            payload.id = idAtual;
+        } else {
+            payload.id = gerarIdSeguro();
+            
+            let maxMat = 0;
+            if (STATE.equipe && STATE.equipe.length > 0) {
+                STATE.equipe.forEach(item => {
+                    let m = parseInt(item.matricula);
+                    if (!isNaN(m) && m > maxMat) maxMat = m;
+                });
+            }
+            payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
+            payload.contrato_assinado = false;
+        }
+        
+        const { error } = await sb.from('jsp_equipe').upsert(payload);
+        if (error) {
+            showLoading(false);
+            return showToast("Erro ao salvar membro da equipe: " + error.message, true);
+        }
+        
+        closeOverlayForm('equipe-form-container');
+        
+        if (isNew) {
+            const nomeEl = document.getElementById('sucesso-nome');
+            const matEl = document.getElementById('sucesso-num-matricula');
+            const modalSucesso = document.getElementById('modal-sucesso-matricula');
+            
+            if(nomeEl) nomeEl.innerText = payload.nome;
+            if(matEl) matEl.innerText = payload.matricula;
+            if(modalSucesso) modalSucesso.classList.remove('hidden');
+            lucide.createIcons();
+        } else {
+            showToast("Funcionário atualizado com sucesso!");
+        }
+        
+        await loadData();
+    }
+}
+
+
+
+
+      
         // ====== SALVAR UNIFICADO ======
-        async function saveEquipe(e) {
+       /* async function saveEquipe(e) {
     e.preventDefault(); 
     showLoading(true);
     
@@ -624,7 +775,7 @@
         
         await loadData();
     }
-}
+}*/
 
         function mascaraCPF(input) {
             let valor = input.value.replace(/\D/g, '');
