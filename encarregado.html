@@ -316,7 +316,7 @@
         finally { btn.disabled = false; btn.innerHTML = 'Salvar'; }
     }
 
-    async function gerarTextoRelatorio() {
+    /*async function gerarTextoRelatorio() {
         if (!equipeGlobal.length) await carregarEquipePorObra();
         const hoje = new Date(); const dataBusca = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
         const { data } = await supabaseClient.from('jsp_ponto_diario').select('*').eq('obra_id', obraAtualId).order('hora_registro');
@@ -339,7 +339,72 @@
         else msg += `\n🎉 *TODOS BATERAM PONTO!*\n`;
         msg += `\n_RV Sistemas_`;
         return msg;
+    }*/
+
+    async function gerarTextoRelatorio() {
+    if (!equipeGlobal.length) await carregarEquipePorObra();
+
+    const hoje = new Date();
+    const dataBusca = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+
+    // Busca SOMENTE registros do dia atual
+    const { data, error } = await supabaseClient
+        .from('jsp_ponto_diario')
+        .select('*')
+        .eq('obra_id', obraAtualId)
+        .gte('hora_registro', `${dataBusca} 00:00:00`)
+        .lte('hora_registro', `${dataBusca} 23:59:59`)
+        .order('hora_registro');
+
+    if (error) {
+        console.error("Erro ao buscar pontos:", error);
+        return "❌ Erro ao gerar relatório. Tente novamente.";
     }
+
+    const registrosHoje = data || []; // já filtrados pelo banco
+
+    const porFunc = {};
+    registrosHoje.forEach(p => {
+        if (!porFunc[p.funcionario_id]) porFunc[p.funcionario_id] = [];
+        porFunc[p.funcionario_id].push(p);
+    });
+
+    const preps = ['de', 'da', 'do', 'das', 'dos', 'e'];
+    let msg = `📋 *RELATÓRIO DE PONTO*\n📍 ${document.getElementById('nome-obra-titulo').innerText}\n📅 ${dataBusca.split('-').reverse().join('/')}\n\n✅ *PRESENTES:*\n`;
+    const faltantes = [];
+
+    equipeGlobal.forEach(f => {
+        const pts = porFunc[f.id] || [];
+        if (pts.length) {
+            let nome = f.nome;
+            const parts = nome.split(' ');
+            if (parts.length >= 3 && preps.includes(parts[1].toLowerCase()))
+                nome = parts.slice(0, 3).join(' ');
+            else if (parts.length >= 2)
+                nome = parts.slice(0, 2).join(' ');
+            msg += `\n👷 *${nome}* (#${f.matricula})\n`;
+            pts.filter(p => p.tipo === 'ENTRADA').forEach(p => {
+                let h = p.hora_registro.split('T')[1]?.substring(0, 5) || '--:--';
+                msg += `   ✅ 📥 ${h}\n`;
+            });
+        } else {
+            faltantes.push(f);
+        }
+    });
+
+    if (faltantes.length) {
+        msg += `\n❌ *FALTAS:*\n`;
+        faltantes.forEach(f => {
+            let nome = f.nome.split(' ').slice(0, 2).join(' ');
+            msg += `   • ${nome} (#${f.matricula})\n`;
+        });
+    } else {
+        msg += `\n🎉 *TODOS BATERAM PONTO!*\n`;
+    }
+
+    msg += `\n_RV Sistemas_`;
+    return msg;
+}
 
     async function compartilharRelatorioWhatsApp() {
     const btn = document.getElementById('btn-whatsapp');
