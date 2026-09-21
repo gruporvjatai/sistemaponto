@@ -155,6 +155,22 @@
     let equipeGlobal = [];
     let terceirizadosGlobal = [];
 
+    function dataLocalISO(d) {
+        const x = d || new Date();
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    }
+
+    async function obterProximoIdPonto() {
+        const { data, error } = await supabaseClient
+            .from('jsp_ponto_diario')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+        if (error) throw error;
+        if (data && data.length) return (parseInt(data[0].id, 10) || 0) + 1;
+        return 1;
+    }
+
     window.onload = () => {
         if (!dadosUsuario) return;
         supabaseClient.auth.getSession().then(function(res) {
@@ -282,11 +298,14 @@
                 if(dup) { alert("Já existe entrada nesse período!"); btn.disabled = false; btn.innerHTML = 'Confirmar'; return; }
             }
             const horaCravada = `${data} ${horaEdit}:00`;
-            await supabaseClient.from('jsp_ponto_diario').update({ status: 'VALIDADO', tipo, hora_registro: horaCravada }).eq('id', pontoId);
+            const { error: errUp } = await supabaseClient.from('jsp_ponto_diario').update({ status: 'VALIDADO', tipo, hora_registro: horaCravada }).eq('id', pontoId);
+            if (errUp) throw errUp;
             if (tipo === 'ENTRADA') {
                 const h = parseInt(horaEdit.split(':')[0]);
                 const saida = h < 12 ? "11:00:00" : "17:00:00";
-                await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: funcId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'AUTO', lng_registro: 'AUTO' }]);
+                const nextId = await obterProximoIdPonto();
+                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextId, funcionario_id: funcId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'AUTO', lng_registro: 'AUTO', pago_em_fechamento: false }]);
+                if (errSaida) throw errSaida;
             }
             carregarPendentes();
         } catch(e) { alert("Erro: "+e.message); } 
@@ -308,13 +327,17 @@
             const hora = document.getElementById('manual-hora').value;
             const tipo = document.getElementById('manual-tipo').value;
             if(!fId || !hora) throw new Error("Preencha todos.");
-            const hoje = new Date(); const data = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+            const data = dataLocalISO();
             const dup = await verificarDuplicidadePeriodo(fId, data, hora);
             if(dup) { alert("Já existe entrada nesse período!"); btn.disabled = false; btn.innerHTML = 'Salvar'; return; }
-            await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: fId, obra_id: obraAtualId, tipo, status: 'VALIDADO', hora_registro: `${data} ${hora}:00`, lat_registro: 'MANUAL', lng_registro: 'MANUAL' }]);
+            const nextId = await obterProximoIdPonto();
+            const { error: errIns } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextId, funcionario_id: fId, obra_id: obraAtualId, tipo, status: 'VALIDADO', hora_registro: `${data} ${hora}:00`, lat_registro: 'MANUAL', lng_registro: 'MANUAL', pago_em_fechamento: false }]);
+            if (errIns) throw errIns;
             if (tipo === 'ENTRADA') {
                 const h = parseInt(hora.split(':')[0]); const saida = h < 12 ? "11:00:00" : "17:00:00";
-                await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: fId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'MANUAL_AUTO', lng_registro: 'MANUAL_AUTO' }]);
+                const nextSaida = await obterProximoIdPonto();
+                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextSaida, funcionario_id: fId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'MANUAL_AUTO', lng_registro: 'MANUAL_AUTO', pago_em_fechamento: false }]);
+                if (errSaida) throw errSaida;
             }
             fecharModalManual(); carregarPendentes(); alert("Ponto salvo!");
         } catch(e) { alert("Erro: "+e.message); } 

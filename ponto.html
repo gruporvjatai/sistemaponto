@@ -90,6 +90,22 @@
             let equipeGlobal = [];
             let timerReset = null;
 
+            function dataLocalISO(d) {
+                const x = d || new Date();
+                return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+            }
+
+            async function obterProximoIdPonto() {
+                const { data, error } = await supabaseClient
+                    .from('jsp_ponto_diario')
+                    .select('id')
+                    .order('id', { ascending: false })
+                    .limit(1);
+                if (error) throw error;
+                if (data && data.length) return (parseInt(data[0].id, 10) || 0) + 1;
+                return 1;
+            }
+
             // Elementos DOM
             const telaErro = document.getElementById('tela-erro');
             const areaFunc = document.getElementById('area-funcionario');
@@ -252,7 +268,7 @@
                 // Verificação de duplicidade (período manhã/tarde)
                 const agora = new Date();
                 const horaAtual = agora.getHours();
-                const dataHoje = agora.toISOString().split('T')[0];
+                const dataHoje = dataLocalISO(agora);
                 let horaInicio, horaFim;
                 if (horaAtual >= 4 && horaAtual < 12) {
                     horaInicio = "04:00:00";
@@ -287,15 +303,18 @@
                 
                 const horaLocal = agora.toLocaleTimeString('pt-BR', { hour12: false });
                 const horaRegistro = `${dataHoje} ${horaLocal}`;
-                
+                const nextId = await obterProximoIdPonto();
+
                 const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
+                    id: nextId,
                     funcionario_id: funcionario.id,
                     obra_id: obraId,
-                    tipo: 'PENDENTE',        // Será confirmado pelo encarregado
+                    tipo: 'ENTRADA',
                     status: 'PENDENTE',
                     hora_registro: horaRegistro,
                     lat_registro: userLat ? userLat.toString() : '',
-                    lng_registro: userLng ? userLng.toString() : ''
+                    lng_registro: userLng ? userLng.toString() : '',
+                    pago_em_fechamento: false
                 }]);
 
                 if (error) {
