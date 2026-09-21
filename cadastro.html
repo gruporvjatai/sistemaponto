@@ -90,6 +90,7 @@
                   <option value="todos">Todos</option>
                   <option value="diaria">Diária</option>
                   <option value="metro">Metro</option>
+                  <option value="empreita">Empreita</option>
               </select>
           </div>
 
@@ -117,12 +118,13 @@
                 <!-- NOVO: Select de categoria com opção Terceirizado -->
                 <div>
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Categoria / Função <span class="text-red-500">*</span></label>
-                    <select id="eqp-categoria" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500" onchange="onCategoriaChange()">
-                        <option value="" disabled selected>-- Selecione --</option>
-                        <option value="Pedreiro">Pedreiro (Diária)</option>
-                        <option value="Servente">Servente (Diária)</option>
-                        <option value="Terceirizado">Terceirizado (Metro)</option>
-                    </select>
+                      <select id="eqp-categoria" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500" onchange="onCategoriaChange()">
+                          <option value="" disabled selected>-- Selecione --</option>
+                          <option value="Pedreiro">Pedreiro (Diária)</option>
+                          <option value="Servente">Servente (Diária)</option>
+                          <option value="Terceirizado">Terceirizado (Metro)</option>
+                          <option value="Empreita">Empreita</option>
+                      </select>
                 </div>
                 
                 <div class="flex gap-2">
@@ -170,6 +172,7 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-500 uppercase" id="label-valor-base">Valor Diária (R$) <span class="text-red-500">*</span></label>
                     <input type="number" step="0.01" id="eqp-valor_diaria" required placeholder="0.00" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 font-black text-slate-700">
+                    <p id="eqp-hint-empreita" class="hidden mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">Empreita usa o valor total do contrato. Os pagamentos saem das medições lançadas na obra, mês a mês, sem ultrapassar este teto.</p>
                 </div>
 
                 <div>
@@ -217,8 +220,21 @@
         // ADICIONADO: STATE agora inclui terceirizados
         let STATE = { obras: [], equipe: [], terceirizados: [] };
 
+        function usuarioPodeGerenciar() {
+            return !!(dadosUsuario && (dadosUsuario.nivel === 'admin' || dadosUsuario.pode_gerenciar === true));
+        }
+
         window.onload = function() { 
-            if (dadosUsuario) { showLoading(true); loadData(); }
+            if (!dadosUsuario) return;
+            showLoading(true);
+            sb.auth.getSession().then(function(res) {
+                if (!res || !res.data || !res.data.session) {
+                    localStorage.removeItem('rv_user');
+                    window.location.replace('index.html');
+                    return;
+                }
+                loadData();
+            });
             lucide.createIcons();          
         };
 
@@ -291,12 +307,15 @@
 
         // ====== NOVA FUNÇÃO: Unifica equipe própria e terceirizados para exibição ======
         function getColaboradoresUnificados() {
-            const equipe = STATE.equipe.map(e => ({
-                ...e,
-                tipo: 'diaria',
-                valor_base: parseFloat(e.valor_diaria || 0),
-                table_origin: 'equipe'
-            }));
+            const equipe = STATE.equipe.map(e => {
+                const isEmpreita = (e.categoria || '') === 'Empreita';
+                return {
+                    ...e,
+                    tipo: isEmpreita ? 'empreita' : 'diaria',
+                    valor_base: parseFloat(e.valor_diaria || 0),
+                    table_origin: 'equipe'
+                };
+            });
 
             const terceirizados = STATE.terceirizados.map(t => ({
                 ...t,
@@ -349,13 +368,15 @@
                 const nomeObra = obra ? obra.nome : 'Sem obra alocada';
                 const isAtivo = c.ativo === true || c.ativo === 'true';
                 
-                const tipoBadge = c.tipo === 'diaria' 
-                    ? '<span class="bg-blue-100 text-blue-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">DIÁRIA</span>'
-                    : '<span class="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">METRO</span>';
-                
-                const valorExibicao = c.tipo === 'diaria' 
-                    ? `Diária: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                    : `Metro: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/m`;
+                let tipoBadge = '<span class="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">METRO</span>';
+                let valorExibicao = `Metro: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/m`;
+                if (c.tipo === 'diaria') {
+                    tipoBadge = '<span class="bg-blue-100 text-blue-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">DIÁRIA</span>';
+                    valorExibicao = `Diária: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+                } else if (c.tipo === 'empreita') {
+                    tipoBadge = '<span class="bg-amber-100 text-amber-700 text-[8px] font-bold px-1.5 py-0.5 rounded ml-1">EMPREITA</span>';
+                    valorExibicao = `Contrato: ${parseFloat(c.valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+                }
 
                 let zapBtn = '';
                 if(c.telefone) {
@@ -366,16 +387,16 @@
                 }
 
                 let botoesAcao = '';
-                if (c.tipo === 'diaria') {
-                    botoesAcao = `<button onclick="openEquipeForm('${c.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
-                } else {
+                if (c.tipo === 'metro') {
                     botoesAcao = `<button onclick="openEquipeForm('${c.id}', 'terceirizado')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
+                } else {
+                    botoesAcao = `<button onclick="openEquipeForm('${c.id}')" class="p-2 bg-slate-100 hover:bg-slate-200 text-blue-700 rounded-lg shrink-0 flex items-center justify-center transition-colors shadow-sm"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`;
                 }
 
                 return `
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
                     <div class="absolute top-3 right-3 flex gap-1.5 items-center">
-                        ${c.tipo === 'diaria' ? `<span class="bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-2 py-1 rounded-md">Mat: ${c.matricula || '-'}</span>` : ''}
+                        ${c.tipo !== 'metro' ? `<span class="bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-2 py-1 rounded-md">Mat: ${c.matricula || '-'}</span>` : ''}
                         <span class="${isAtivo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} text-[9px] font-black px-2 py-1 rounded-md tracking-wider">${isAtivo ? 'ATIVO' : 'INATIVO'}</span>
                     </div>
                     
@@ -404,13 +425,20 @@
             const cat = document.getElementById('eqp-categoria').value;
             const label = document.getElementById('label-valor-base');
             const tipoOrigem = document.getElementById('eqp-tipo-origem');
+            const hint = document.getElementById('eqp-hint-empreita');
             
             if (cat === 'Terceirizado') {
                 label.innerText = 'Valor do Metro (R$) *';
                 tipoOrigem.value = 'terceirizado';
+                if (hint) hint.classList.add('hidden');
+            } else if (cat === 'Empreita') {
+                label.innerText = 'Valor Total do Contrato (R$) *';
+                tipoOrigem.value = 'equipe';
+                if (hint) hint.classList.remove('hidden');
             } else {
                 label.innerText = 'Valor Diária (R$) *';
                 tipoOrigem.value = 'equipe';
+                if (hint) hint.classList.add('hidden');
             }
         }
 
@@ -797,7 +825,7 @@
             return nums.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
         }
 
-        function fazerLogout() { localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
+        function fazerLogout() { try { sb.auth.signOut(); } catch (_) {} localStorage.removeItem('rv_user'); window.location.replace('index.html'); }
     </script>
   </body>
 </html>

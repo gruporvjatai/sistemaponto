@@ -106,7 +106,6 @@
 
             // Inicialização
             window.onload = function() {
-                // Verifica se há obra definida no localStorage (definida pelo encarregado)
                 obraId = localStorage.getItem('obra_atual_id');
                 if (!obraId) {
                     telaErro.classList.remove('hidden');
@@ -115,7 +114,6 @@
 
                 areaFunc.classList.remove('hidden');
                 
-                // Inicializa Supabase
                 if (typeof supabase === 'undefined') {
                     dbStatus.innerHTML = 'Erro crítico: biblioteca do banco de dados não carregou.';
                     dbStatus.className = "mb-3 p-3 rounded-lg bg-red-100 text-red-800 text-xs font-bold";
@@ -123,9 +121,17 @@
                 }
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                // Inicia carregamentos
-                carregarDadosBanco();
-                iniciarGPS();
+                supabaseClient.auth.getSession().then(function(res) {
+                    if (!res || !res.data || !res.data.session) {
+                        telaErro.classList.remove('hidden');
+                        areaFunc.classList.add('hidden');
+                        const msg = document.getElementById('msg-erro');
+                        if (msg) msg.textContent = 'Sessão expirada. Faça login novamente no sistema de ponto.';
+                        return;
+                    }
+                    carregarDadosBanco();
+                    iniciarGPS();
+                });
             };
 
             // ----- Banco de Dados -----
@@ -149,9 +155,10 @@
                     // Carrega equipe (apenas funcionários ativos desta obra)
                     const { data: equipe } = await supabaseClient
                         .from('jsp_equipe')
-                        .select('id, nome, matricula, obra_atual_id')
+                        .select('id, nome, matricula, obra_atual_id, categoria')
                         .eq('obra_atual_id', obraId)
-                        .eq('ativo', true);
+                        .eq('ativo', true)
+                        .neq('categoria', 'Empreita');
                     equipeGlobal = equipe || [];
                     
                     dbOk = true;

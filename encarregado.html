@@ -142,13 +142,37 @@
     const SUPABASE_KEY = 'sb_publishable_B2a4vA22qf4XGcrxPDRAaw_13rW51uI';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    let dadosUsuario = null;
+    const userSessao = localStorage.getItem('rv_user');
+    if (!userSessao) window.location.replace('index.html');
+    else dadosUsuario = JSON.parse(userSessao);
+
+    function usuarioPodeGerenciar() {
+        return !!(dadosUsuario && (dadosUsuario.nivel === 'admin' || dadosUsuario.pode_gerenciar === true));
+    }
+
     let obraAtualId = null;
     let equipeGlobal = [];
     let terceirizadosGlobal = [];
 
-    window.onload = () => { carregarObras(); };
+    window.onload = () => {
+        if (!dadosUsuario) return;
+        supabaseClient.auth.getSession().then(function(res) {
+            if (!res || !res.data || !res.data.session) {
+                localStorage.removeItem('rv_user');
+                window.location.replace('index.html');
+                return;
+            }
+            carregarObras();
+        });
+    };
 
-    function sair() { localStorage.removeItem('obra_atual_id'); window.location.href = 'index.html'; }
+    function sair() {
+        try { supabaseClient.auth.signOut(); } catch (_) {}
+        localStorage.removeItem('obra_atual_id');
+        localStorage.removeItem('rv_user');
+        window.location.href = 'index.html';
+    }
 
     async function carregarObras() {
         const { data } = await supabaseClient.from('jsp_obras').select('id, nome').order('nome');
@@ -174,7 +198,7 @@
     async function carregarEquipePorObra() {
         const selectManual = document.getElementById('manual-funcionario');
         selectManual.innerHTML = '<option value="">Carregando...</option>';
-        const { data, error } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula').eq('obra_atual_id', obraAtualId).eq('ativo', true).order('nome');
+        const { data, error } = await supabaseClient.from('jsp_equipe').select('id, nome, matricula, categoria').eq('obra_atual_id', obraAtualId).eq('ativo', true).neq('categoria', 'Empreita').order('nome');
         if (error) { selectManual.innerHTML = '<option value="">Erro</option>'; equipeGlobal = []; return; }
         selectManual.innerHTML = '';
         if (data && data.length) {
@@ -461,7 +485,7 @@ async function compartilharRelatorioExterno() {
 
     async function definirLocalObra() {
         const sel = document.getElementById('select-obra'); if(!sel.value) return alert("Selecione a obra!");
-        const senha = prompt("Senha Admin:"); if(senha !== "rvadmin") return alert("Senha incorreta!");
+        if(!usuarioPodeGerenciar()) return alert("Acesso restrito. Permissão de gerenciamento necessária.");
         if(!confirm("Definir localização atual como sede da obra?")) return;
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const { error } = await supabaseClient.from('jsp_obras').update({ lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }).eq('id', sel.value);
