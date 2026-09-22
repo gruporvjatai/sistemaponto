@@ -615,24 +615,19 @@
         if (!isNew) {
             payload.id = idAtual;
         } else {
+            // A matricula e gerada pelo banco (trigger trg_matricula_equipe ->
+            // gerar_matricula_global / global_matricula_seq), garantindo numero
+            // unico global. Nao calculamos matricula no cliente.
             payload.id = gerarIdSeguro();
-            
-            let maxMat = 0;
-            if (STATE.equipe && STATE.equipe.length > 0) {
-                STATE.equipe.forEach(item => {
-                    let m = parseInt(item.matricula);
-                    if (!isNaN(m) && m > maxMat) maxMat = m;
-                });
-            }
-            payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
             payload.contrato_assinado = false;
         }
         
-        const { error } = await sb.from('jsp_equipe').upsert(payload);
+        const { data: salvo, error } = await sb.from('jsp_equipe').upsert(payload).select('matricula').single();
         if (error) {
             showLoading(false);
             return showToast("Erro ao salvar membro da equipe: " + error.message, true);
         }
+        if (isNew && salvo) payload.matricula = salvo.matricula;
         
         closeOverlayForm('equipe-form-container');
         
@@ -767,24 +762,19 @@
         if (!isNew) {
             payload.id = idAtual;
         } else {
+            // A matricula e gerada pelo banco (trigger trg_matricula_equipe ->
+            // gerar_matricula_global / global_matricula_seq), garantindo numero
+            // unico global. Nao calculamos matricula no cliente.
             payload.id = gerarIdSeguro();
-            
-            let maxMat = 0;
-            if (STATE.equipe && STATE.equipe.length > 0) {
-                STATE.equipe.forEach(item => {
-                    let m = parseInt(item.matricula);
-                    if (!isNaN(m) && m > maxMat) maxMat = m;
-                });
-            }
-            payload.matricula = maxMat > 0 ? maxMat + 1 : 133;
             payload.contrato_assinado = false;
         }
         
-        const { error } = await sb.from('jsp_equipe').upsert(payload);
+        const { data: salvo, error } = await sb.from('jsp_equipe').upsert(payload).select('matricula').single();
         if (error) {
             showLoading(false);
             return showToast("Erro ao salvar membro da equipe: " + error.message, true);
         }
+        if (isNew && salvo) payload.matricula = salvo.matricula;
         
         closeOverlayForm('equipe-form-container');
         

@@ -160,16 +160,8 @@
         return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
     }
 
-    async function obterProximoIdPonto() {
-        const { data, error } = await supabaseClient
-            .from('jsp_ponto_diario')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-        if (error) throw error;
-        if (data && data.length) return (parseInt(data[0].id, 10) || 0) + 1;
-        return 1;
-    }
+    // O id de jsp_ponto_diario e gerado pela sequencia do banco
+    // (jsp_ponto_diario_id_seq). Nao enviamos id no insert.
 
     window.onload = () => {
         if (!dadosUsuario) return;
@@ -303,8 +295,7 @@
             if (tipo === 'ENTRADA') {
                 const h = parseInt(horaEdit.split(':')[0]);
                 const saida = h < 12 ? "11:00:00" : "17:00:00";
-                const nextId = await obterProximoIdPonto();
-                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextId, funcionario_id: funcId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'AUTO', lng_registro: 'AUTO', pago_em_fechamento: false }]);
+                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: funcId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'AUTO', lng_registro: 'AUTO', pago_em_fechamento: false }]);
                 if (errSaida) throw errSaida;
             }
             carregarPendentes();
@@ -330,13 +321,11 @@
             const data = dataLocalISO();
             const dup = await verificarDuplicidadePeriodo(fId, data, hora);
             if(dup) { alert("Já existe entrada nesse período!"); btn.disabled = false; btn.innerHTML = 'Salvar'; return; }
-            const nextId = await obterProximoIdPonto();
-            const { error: errIns } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextId, funcionario_id: fId, obra_id: obraAtualId, tipo, status: 'VALIDADO', hora_registro: `${data} ${hora}:00`, lat_registro: 'MANUAL', lng_registro: 'MANUAL', pago_em_fechamento: false }]);
+            const { error: errIns } = await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: fId, obra_id: obraAtualId, tipo, status: 'VALIDADO', hora_registro: `${data} ${hora}:00`, lat_registro: 'MANUAL', lng_registro: 'MANUAL', pago_em_fechamento: false }]);
             if (errIns) throw errIns;
             if (tipo === 'ENTRADA') {
                 const h = parseInt(hora.split(':')[0]); const saida = h < 12 ? "11:00:00" : "17:00:00";
-                const nextSaida = await obterProximoIdPonto();
-                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ id: nextSaida, funcionario_id: fId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'MANUAL_AUTO', lng_registro: 'MANUAL_AUTO', pago_em_fechamento: false }]);
+                const { error: errSaida } = await supabaseClient.from('jsp_ponto_diario').insert([{ funcionario_id: fId, obra_id: obraAtualId, tipo: 'SAIDA', status: 'VALIDADO', hora_registro: `${data} ${saida}`, lat_registro: 'MANUAL_AUTO', lng_registro: 'MANUAL_AUTO', pago_em_fechamento: false }]);
                 if (errSaida) throw errSaida;
             }
             fecharModalManual(); carregarPendentes(); alert("Ponto salvo!");

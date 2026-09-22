@@ -95,16 +95,9 @@
                 return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
             }
 
-            async function obterProximoIdPonto() {
-                const { data, error } = await supabaseClient
-                    .from('jsp_ponto_diario')
-                    .select('id')
-                    .order('id', { ascending: false })
-                    .limit(1);
-                if (error) throw error;
-                if (data && data.length) return (parseInt(data[0].id, 10) || 0) + 1;
-                return 1;
-            }
+            // O id de jsp_ponto_diario e gerado pela sequencia do banco
+            // (jsp_ponto_diario_id_seq). Nao enviamos id no insert para evitar
+            // colisao entre dois aparelhos registrando ao mesmo tempo.
 
             // Elementos DOM
             const telaErro = document.getElementById('tela-erro');
@@ -303,10 +296,8 @@
                 
                 const horaLocal = agora.toLocaleTimeString('pt-BR', { hour12: false });
                 const horaRegistro = `${dataHoje} ${horaLocal}`;
-                const nextId = await obterProximoIdPonto();
 
                 const { error } = await supabaseClient.from('jsp_ponto_diario').insert([{
-                    id: nextId,
                     funcionario_id: funcionario.id,
                     obra_id: obraId,
                     tipo: 'ENTRADA',
