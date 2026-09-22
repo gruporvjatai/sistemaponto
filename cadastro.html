@@ -109,6 +109,7 @@
             <form onsubmit="saveEquipe(event)" class="space-y-3">
                 <input type="hidden" id="eqp-id">
                 <input type="hidden" id="eqp-tipo-origem" value="equipe"> <!-- NOVO -->
+                <input type="hidden" id="eqp-origem" value=""> <!-- tabela de origem do cadastro em edicao -->
                 
                 <div>
                     <label class="text-[10px] font-bold text-slate-500 uppercase">Nome Completo <span class="text-red-500">*</span></label>
@@ -446,6 +447,7 @@
         function openEquipeForm(id, tipoOrigem = 'equipe') {
     const catSelect = document.getElementById('eqp-categoria');
     const tipoHidden = document.getElementById('eqp-tipo-origem');
+    const origemHidden = document.getElementById('eqp-origem');
     
     if (id) {
         if (tipoOrigem === 'terceirizado') {
@@ -464,6 +466,7 @@
                 document.getElementById('eqp-valor_diaria').value = t.valor_metro || '';
                 document.getElementById('eqp-ativo').value = (t.ativo === true || t.ativo === 'true') ? 'true' : 'false';
                 tipoHidden.value = 'terceirizado';
+                origemHidden.value = 'terceirizado';
                 onCategoriaChange();
             }
         } else {
@@ -482,6 +485,7 @@
                 document.getElementById('eqp-data_contrato').value = e.data_contrato || '';
                 document.getElementById('eqp-ativo').value = (e.ativo === true || e.ativo === 'true') ? 'true' : 'false';
                 tipoHidden.value = 'equipe';
+                origemHidden.value = 'equipe';
                 onCategoriaChange();
             }
         }
@@ -491,6 +495,7 @@
         catSelect.value = 'Servente';
         document.getElementById('eqp-ativo').value = 'true';
         tipoHidden.value = 'equipe';
+        origemHidden.value = '';
         onCategoriaChange();
     }
     openOverlayForm('equipe-form-container');
@@ -504,6 +509,36 @@
                 var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
+        }
+
+        // Conta registros vinculados ao colaborador na origem (producao de
+        // terceirizado ou ponto/medicao de equipe). Bloqueia a troca de tipo
+        // (terceirizado <-> diaria) sem duplicar cadastro ou perder historico.
+        // Retorna -1 se nao for possivel verificar.
+        async function contarDependenciasColaborador(origem, id) {
+            if (!id) return 0;
+            try {
+                if (origem === 'terceirizado') {
+                    const { count, error } = await sb.from('jsp_producao_terc')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('terceirizado_id', id);
+                    if (error) return -1;
+                    return count || 0;
+                }
+                const a = await sb.from('jsp_ponto_diario')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('funcionario_id', id);
+                const b = await sb.from('jsp_ponto_mensal')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('funcionario_id', id);
+                const c = await sb.from('jsp_medicoes_empreita')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('equipe_id', id);
+                if (a.error || b.error || c.error) return -1;
+                return (a.count || 0) + (b.count || 0) + (c.count || 0);
+            } catch (err) {
+                return -1;
+            }
         }
 
 
@@ -522,6 +557,7 @@
     const idAtual = getV('eqp-id');
     const isNew = !idAtual;
     const tipoOrigem = document.getElementById('eqp-tipo-origem').value;
+    const origem = getV('eqp-origem');
     
     const nome = getV('eqp-nome');
     const categoria = getV('eqp-categoria');
@@ -568,6 +604,23 @@
     }
     // ================================================================
 
+    const mudouTipo = !isNew && origem && origem !== tipoOrigem;
+    if (mudouTipo) {
+        const dep = await contarDependenciasColaborador(origem, idAtual);
+        if (dep === -1) {
+            showLoading(false);
+            showToast("Não foi possível verificar os registros do colaborador. Tente novamente.", true);
+            return;
+        }
+        if (dep > 0) {
+            showLoading(false);
+            showToast(origem === 'terceirizado'
+                ? `Este terceirizado tem ${dep} lançamento(s) de produção (metros). Não é possível mudar para diária sem perder esse histórico.`
+                : `Este funcionário tem ${dep} registro(s) de ponto/medição. Não é possível mudar para terceirizado sem perder esse histórico.`, true);
+            return;
+        }
+    }
+
     if (tipoOrigem === 'terceirizado') {
         const payload = {
             nome,
@@ -592,6 +645,14 @@
         if (error) {
             showLoading(false);
             return showToast("Erro ao salvar terceirizado: " + error.message, true);
+        }
+        
+        if (mudouTipo) {
+            const { error: errMove } = await sb.from('jsp_equipe').delete().eq('id', idAtual);
+            if (errMove) {
+                showLoading(false);
+                return showToast("Erro ao remover o cadastro antigo: " + errMove.message, true);
+            }
         }
         
         closeOverlayForm('equipe-form-container');
@@ -628,6 +689,14 @@
             return showToast("Erro ao salvar membro da equipe: " + error.message, true);
         }
         if (isNew && salvo) payload.matricula = salvo.matricula;
+        
+        if (mudouTipo) {
+            const { error: errMove } = await sb.from('jsp_terceirizados').delete().eq('id', idAtual);
+            if (errMove) {
+                showLoading(false);
+                return showToast("Erro ao remover o cadastro antigo: " + errMove.message, true);
+            }
+        }
         
         closeOverlayForm('equipe-form-container');
         
